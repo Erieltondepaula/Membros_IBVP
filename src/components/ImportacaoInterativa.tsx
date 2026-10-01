@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,8 @@ interface DadosItem {
   idExterno?: string;
   telefone?: string;
   dataNascimento?: string;
+  status?: string; // NOVO, EXISTE, etc
+  membroCompleto?: Partial<Member>; // Objeto Member completo do Excel
   requerConfirmacao: boolean;
   diferencas?: {
     label: string;
@@ -83,6 +86,10 @@ const ImportacaoInterativa = () => {
   const [estatisticasFinais, setEstatisticasFinais] = useState<EstatisticasFinais | null>(null);
   const [importandoCompleto, setImportandoCompleto] = useState(false);
   const [arquivoAtual, setArquivoAtual] = useState<File | null>(null);
+  // Novo: IDs das linhas marcadas para atualização
+  const [linhasParaAtualizar, setLinhasParaAtualizar] = useState<number[]>([]);
+  // Checkbox de seleção em lote
+  const [selecionarTodos, setSelecionarTodos] = useState(false);
 
   // NOVA FUNÇÃO: Importação Completa (Substitui Tudo)
   const importarCompleto = async (arquivo: File) => {
@@ -209,8 +216,11 @@ const ImportacaoInterativa = () => {
             acao: 'criar_novo',
             nome: membro.nome || '',
             nomeCompleto: membro.nomeCompleto,
+            idExterno: membro.idExterno,
             telefone: membro.telefone,
             dataNascimento: membro.dataNascimento,
+            status: 'NOVO',
+            membroCompleto: membro,
             requerConfirmacao: false
           });
         } else {
@@ -251,8 +261,10 @@ const ImportacaoInterativa = () => {
               acao: 'confirmar_atualizacao',
               nome: membro.nome || '',
               nomeCompleto: membro.nomeCompleto,
+              idExterno: membro.idExterno,
               telefone: membro.telefone,
               dataNascimento: membro.dataNascimento,
+              status: 'EXISTE',
               requerConfirmacao: true,
               diferencas
             });
@@ -264,8 +276,10 @@ const ImportacaoInterativa = () => {
               acao: 'sem_alteracao',
               nome: membro.nome || '',
               nomeCompleto: membro.nomeCompleto,
+              idExterno: membro.idExterno,
               telefone: membro.telefone,
               dataNascimento: membro.dataNascimento,
+              status: 'EXISTE',
               requerConfirmacao: false
             });
           }
@@ -312,9 +326,35 @@ const ImportacaoInterativa = () => {
         onConfirm: () => executarAcao(item, acao),
         onCancel: () => setModalConfirmacao(null)
       });
+      setLinhasParaAtualizar((prev) => prev.includes(item.linha) ? prev : [...prev, item.linha]);
     } else {
       await executarAcao(item, acao);
+      if (acao === 'atualizar') {
+        setLinhasParaAtualizar((prev) => prev.includes(item.linha) ? prev : [...prev, item.linha]);
+      }
+      if (acao === 'ignorar') {
+        setLinhasParaAtualizar((prev) => prev.filter(l => l !== item.linha));
+      }
     }
+  };
+
+  // Seleção em lote: marcar/desmarcar todos
+  const handleSelecionarTodos = () => {
+    if (!dadosAnalise) return;
+    if (!selecionarTodos) {
+      // Seleciona todas as linhas de atualização
+      const todas = dadosAnalise.dados.filter(item => item.acao === 'confirmar_atualizacao').map(item => item.linha);
+      setLinhasParaAtualizar(todas);
+      setSelecionarTodos(true);
+    } else {
+      setLinhasParaAtualizar([]);
+      setSelecionarTodos(false);
+    }
+  };
+
+  // Seleção individual por checkbox
+  const handleSelecionarLinha = (linha: number) => {
+    setLinhasParaAtualizar((prev) => prev.includes(linha) ? prev.filter(l => l !== linha) : [...prev, linha]);
   };
 
   // Executar ação individual
@@ -365,57 +405,119 @@ const ImportacaoInterativa = () => {
       return;
     }
 
-    const acoesPendentes = dadosAnalise.dados
-      .filter((item: DadosItem) => item.acao === 'criar_novo' || item.acao === 'sem_alteracao');
-
-    if (acoesPendentes.length === 0) return;
+    // 🎯 LÓGICA CORRIGIDA: Processar automaticamente APENAS os NOVOS cadastros
+    // Não exige que o usuário marque nada para atualização
+    const novos = dadosAnalise.dados.filter((item: DadosItem) => item.acao === 'criar_novo');
+    
+    if (novos.length === 0) {
+      alert('Nenhum novo cadastro para processar. Se deseja atualizar registros existentes, use o botão "Atualizar Todos".');
+      return;
+    }
 
     try {
       setProcessando(true);
       setProgresso(0);
 
-      // Importar usando excelUtils
-      const membrosImportados = await importFromExcel(arquivoAtual);
+      // Monta o payload com os NOVOS membros (objetos Member completos)
+      const membrosNovos = novos.map(item => item.membroCompleto).filter(Boolean);
 
-      console.log(`📊 Processando ${membrosImportados.length} membros...`);
-
-      // Enviar para o backend (com delay de 2 segundos entre cada)
+      // Envia para o backend
       const response = await fetch('http://localhost:5001/api/members/batch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          members: membrosImportados,
-          replaceAll: true
+          members: membrosNovos,
+          replaceAll: false
         }),
       });
 
       const resultado = await response.json();
 
-      if (resultado.stats) {
+      if (resultado.success) {
         setEstatisticasFinais({
-          total: resultado.stats.total_received,
-          criados: resultado.stats.success,
-          erros: resultado.stats.errors,
-          pulados: resultado.stats.duplicates || 0,
-          totalFinal: resultado.stats.success
+          total: membrosNovos.length,
+          criados: resultado.inserted || membrosNovos.length,
+          atualizados: 0,
+          erros: resultado.errors?.length || 0,
+          ignorados: resultado.ignored || 0
         });
-
         setProgresso(100);
         setEtapa('concluido');
-
-        alert(`✅ Importação concluída!\n\n` +
-              `📊 Total: ${resultado.stats.total_received}\n` +
-              `✅ Criados: ${resultado.stats.success}\n` +
-              `⏭️ Duplicatas: ${resultado.stats.duplicates || 0}\n` +
-              `❌ Erros: ${resultado.stats.errors}`);
+        alert(`✅ Novos cadastros processados com sucesso!\n\n` +
+              `📊 Total: ${membrosNovos.length}\n` +
+              `✅ Criados: ${resultado.inserted || membrosNovos.length}\n` +
+              `❌ Erros: ${resultado.errors?.length || 0}`);
       } else {
         throw new Error(resultado.message || 'Erro desconhecido');
       }
     } catch (error) {
       console.error('❌ Erro ao processar:', error);
-      alert('❌ Erro ao processar importação: ' + (error as Error).message);
+      alert('❌ Erro ao processar novos cadastros: ' + (error as Error).message);
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  // 🔄 Função para processar ATUALIZAÇÕES (registros marcados pelo usuário)
+  const processarAtualizacoes = async () => {
+    if (!dadosAnalise || !dadosAnalise.dados) return;
+    if (!arquivoAtual) {
+      alert('❌ Arquivo não encontrado. Por favor, faça upload novamente.');
+      return;
+    }
+
+    // Filtra os itens marcados para atualização
+    const itensParaAtualizar = dadosAnalise.dados.filter((item: DadosItem) => linhasParaAtualizar.includes(item.linha));
+    if (itensParaAtualizar.length === 0) {
+      alert('Nenhum registro marcado para atualização. Clique em "Atualizar" nas linhas desejadas.');
+      return;
+    }
+
+    try {
+      setProcessando(true);
+      setProgresso(0);
+
+      // Monta o payload para atualização
+      const membrosParaAtualizar = itensParaAtualizar.map(item => ({
+        ...item
+      }));
+
+      // Envia para o backend
+      const response = await fetch('http://localhost:5001/api/members/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          members: membrosParaAtualizar,
+          replaceAll: false
+        }),
+      });
+
+      const resultado = await response.json();
+
+      if (resultado.success) {
+        setEstatisticasFinais({
+          total: membrosParaAtualizar.length,
+          atualizados: resultado.updated || membrosParaAtualizar.length,
+          criados: 0,
+          erros: resultado.errors?.length || 0,
+          ignorados: resultado.ignored || 0
+        });
+        setProgresso(100);
+        setEtapa('concluido');
+        alert(`✅ Atualização concluída!\n\n` +
+              `📊 Total: ${membrosParaAtualizar.length}\n` +
+              `✅ Atualizados: ${resultado.updated || membrosParaAtualizar.length}\n` +
+              `❌ Erros: ${resultado.errors?.length || 0}`);
+      } else {
+        throw new Error(resultado.message || 'Erro desconhecido');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao processar:', error);
+      alert('❌ Erro ao processar atualizações: ' + (error as Error).message);
     } finally {
       setProcessando(false);
     }
@@ -458,14 +560,14 @@ const ImportacaoInterativa = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Botão de Importação Completa */}
-        <div className="border-2 border-red-300 bg-red-50 rounded-lg p-6">
+        <div className="border-2 border-destructive/20 bg-destructive/10 rounded-lg p-6">
           <div className="flex items-start gap-3 mb-4">
-            <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-red-900 mb-1">
+              <h3 className="font-semibold text-destructive mb-1">
                 Importar Planilha (Substituir Tudo)
               </h3>
-              <p className="text-sm text-red-700 mb-3">
+              <p className="text-sm text-destructive mb-3">
                 ⚠️ Esta opção irá <strong>LIMPAR TODO O BANCO DE DADOS</strong> e importar apenas os dados do Excel.
                 Use apenas quando quiser substituir completamente os dados do sistema.
               </p>
@@ -507,19 +609,19 @@ const ImportacaoInterativa = () => {
             <span className="w-full border-t" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-gray-500">Ou</span>
+            <span className="bg-background px-2 text-muted-foreground">Ou</span>
           </div>
         </div>
 
         {/* Importação Interativa Original */}
-        <div className="border-2 border-blue-300 bg-blue-50 rounded-lg p-6">
+        <div className="border-2 border-border bg-muted rounded-lg p-6">
           <div className="flex items-start gap-3 mb-4">
-            <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+            <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-1">
+              <h3 className="font-semibold text-foreground mb-1">
                 Importação Interativa (Recomendado)
               </h3>
-              <p className="text-sm text-blue-700 mb-3">
+              <p className="text-sm text-muted-foreground mb-3">
                 Revise cada linha da planilha e escolha se deseja criar, atualizar ou ignorar cada registro.
                 Mais seguro para atualizações parciais.
               </p>
@@ -528,16 +630,16 @@ const ImportacaoInterativa = () => {
           <div
             {...getRootProps()}
             className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-              ${isDragActive ? 'border-blue-500 bg-blue-100' : 'border-blue-300 hover:border-blue-400'}`}
+              ${isDragActive ? 'border-primary/60 bg-primary/10' : 'border-border hover:border-primary/50'}`}
           >
             <input {...getInputProps()} />
-            <FileText className="h-12 w-12 mx-auto text-blue-400 mb-4" />
+            <FileText className="h-12 w-12 mx-auto text-primary/70 mb-4" />
             {isDragActive ? (
               <p className="text-lg">Solte o arquivo aqui...</p>
             ) : (
               <>
                 <p className="text-lg mb-2">Arraste um arquivo Excel aqui</p>
-                <p className="text-sm text-gray-600">ou clique para selecionar</p>
+                <p className="text-sm text-muted-foreground">ou clique para selecionar</p>
               </>
             )}
           </div>
@@ -593,37 +695,37 @@ const ImportacaoInterativa = () => {
           {/* Estatísticas - VISUAL MELHORADO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Card: Novos Cadastros */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 p-6 rounded-xl shadow-md">
+            <div className="bg-card border-2 border-border p-6 rounded-xl shadow-md">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="bg-blue-500 text-white rounded-full p-2">
+                  <div className="bg-primary text-primary-foreground rounded-full p-2">
                     <Users className="h-5 w-5" />
                   </div>
-                  <h3 className="font-semibold text-blue-900">Novos Cadastros</h3>
+                  <h3 className="font-semibold text-foreground">Novos Cadastros</h3>
                 </div>
-                <div className="text-4xl font-bold text-blue-600">
+                <div className="text-4xl font-bold text-primary">
                   {dadosAnalise.estatisticas.novosUsuarios || dadosAnalise.estatisticas.novos}
                 </div>
               </div>
-              <p className="text-sm text-blue-700">
+              <p className="text-sm text-muted-foreground">
                 Membros que serão <strong>criados</strong> no sistema
               </p>
             </div>
 
             {/* Card: Atualizações */}
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 p-6 rounded-xl shadow-md">
+            <div className="bg-card border-2 border-border p-6 rounded-xl shadow-md">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="bg-orange-500 text-white rounded-full p-2">
+                  <div className="bg-warning text-warning-foreground rounded-full p-2">
                     <RefreshCw className="h-5 w-5" />
                   </div>
-                  <h3 className="font-semibold text-orange-900">Atualizações</h3>
+                  <h3 className="font-semibold text-foreground">Atualizações</h3>
                 </div>
-                <div className="text-4xl font-bold text-orange-600">
+                <div className="text-4xl font-bold text-warning">
                   {dadosAnalise.estatisticas.atualizacoes}
                 </div>
               </div>
-              <p className="text-sm text-orange-700">
+              <p className="text-sm text-muted-foreground">
                 Membros existentes com <strong>alterações</strong> detectadas
               </p>
             </div>
@@ -631,29 +733,37 @@ const ImportacaoInterativa = () => {
 
           {/* Informações adicionais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+            <div className="bg-success/10 border border-success/20 p-4 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-green-700">Sem Alteração</span>
-                <span className="text-2xl font-bold text-green-600">
+                <span className="text-sm font-medium text-success">Sem Alteração</span>
+                <span className="text-2xl font-bold text-success">
                   {dadosAnalise.estatisticas.semAlteracao || 0}
                 </span>
               </div>
-              <p className="text-xs text-green-600 mt-1">Registros idênticos ao banco</p>
+              <p className="text-xs text-muted-foreground mt-1">Registros idênticos ao banco</p>
             </div>
-            <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+            <div className="bg-muted border border-border p-4 rounded-lg">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Total de Linhas</span>
-                <span className="text-2xl font-bold text-gray-600">
+                <span className="text-sm font-medium text-muted-foreground">Total de Linhas</span>
+                <span className="text-2xl font-bold text-muted-foreground">
                   {dadosAnalise.estatisticas.totalLinhas}
                 </span>
               </div>
-              <p className="text-xs text-gray-600 mt-1">No arquivo Excel</p>
+              <p className="text-xs text-muted-foreground mt-1">No arquivo Excel</p>
             </div>
           </div>
 
           <div className="flex gap-4 mb-6">
             <Button onClick={processarTodosAutomaticos}>
               Processar Automáticos
+            </Button>
+            <Button
+              onClick={processarAtualizacoes}
+              variant="secondary"
+              disabled={linhasParaAtualizar.length === 0}
+              style={{ display: 'inline-block', minWidth: 160 }}
+            >
+              Atualizar Todos {linhasParaAtualizar.length > 0 ? `(${linhasParaAtualizar.length})` : ''}
             </Button>
             <Button variant="outline" onClick={reiniciar}>
               Cancelar
@@ -681,6 +791,13 @@ const ImportacaoInterativa = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead style={{ width: 40 }}>
+                  <Checkbox
+                    checked={selecionarTodos}
+                    onCheckedChange={handleSelecionarTodos}
+                    aria-label="Selecionar todos para atualização"
+                  />
+                </TableHead>
                 <TableHead>Linha</TableHead>
                 <TableHead>ID Externo</TableHead>
                 <TableHead>Nome</TableHead>
@@ -695,16 +812,24 @@ const ImportacaoInterativa = () => {
                 const resultado = resultados.find(r => r.linha === item.linha);
                 const isNovo = item.acao === 'criar_novo';
                 const isAtualizacao = item.acao === 'confirmar_atualizacao';
-                
+                const checked = linhasParaAtualizar.includes(item.linha);
                 return (
-                  <TableRow 
+                  <TableRow
                     key={item.linha}
                     className={
-                      isNovo ? 'bg-blue-50/50 hover:bg-blue-100/50' :
-                      isAtualizacao ? 'bg-orange-50/50 hover:bg-orange-100/50' :
-                      'hover:bg-gray-50'
+                        isNovo ? 'bg-primary/10 hover:bg-primary/20' :
+                          isAtualizacao ? 'bg-warning/10 hover:bg-warning/20' :
+                          'hover:bg-muted/50'
                     }
                   >
+                    <TableCell>
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => handleSelecionarLinha(item.linha)}
+                        aria-label={`Selecionar linha ${item.linha} para atualização`}
+                        disabled={!isAtualizacao}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{item.linha}</TableCell>
                     <TableCell>{item.idExterno || '-'}</TableCell>
                     <TableCell className="font-medium">{item.nomeCompleto || item.nome}</TableCell>
@@ -712,9 +837,9 @@ const ImportacaoInterativa = () => {
                       <Badge 
                         variant={isNovo ? 'default' : isAtualizacao ? 'destructive' : 'secondary'}
                         className={
-                          isNovo ? 'bg-blue-500 hover:bg-blue-600' :
-                          isAtualizacao ? 'bg-orange-500 hover:bg-orange-600' :
-                          ''
+                          isNovo ? 'bg-primary text-primary-foreground hover:opacity-95' :
+                            isAtualizacao ? 'bg-warning text-warning-foreground hover:opacity-95' :
+                            ''
                         }
                       >
                         {isNovo && (
@@ -731,24 +856,24 @@ const ImportacaoInterativa = () => {
                     <TableCell>
                       {item.diferencas && item.diferencas.length > 0 ? (
                         <div className="space-y-1">
-                          <div className="text-xs font-semibold text-orange-700 mb-1">
+                          <div className="text-xs font-semibold text-warning mb-1">
                             {item.diferencas.length} campo(s) diferente(s):
                           </div>
                           {item.diferencas.map((diff, idx) => (
-                            <div key={idx} className="text-xs bg-white p-2 rounded border border-orange-200">
-                              <span className="font-medium text-orange-600">{diff.label}:</span>{' '}
+                            <div key={idx} className="text-xs bg-card p-2 rounded border border-border">
+                              <span className="font-medium text-warning">{diff.label}:</span>{' '}
                               <div className="mt-1">
-                                <span className="line-through text-gray-500">{diff.valorAtual}</span>
-                                <span className="text-orange-600 mx-2">→</span>
-                                <span className="text-green-600 font-semibold">{diff.valorNovo}</span>
+                                <span className="line-through text-muted-foreground">{diff.valorAtual}</span>
+                                <span className="text-warning mx-2">→</span>
+                                <span className="text-success font-semibold">{diff.valorNovo}</span>
                               </div>
                             </div>
                           ))}
                         </div>
-                      ) : isNovo ? (
-                        <span className="text-blue-600 text-sm font-medium">Novo membro</span>
+                        ) : isNovo ? (
+                        <span className="text-primary text-sm font-medium">Novo membro</span>
                       ) : (
-                        <span className="text-gray-400 text-sm">Sem mudanças</span>
+                        <span className="text-muted-foreground text-sm">Sem mudanças</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -824,26 +949,26 @@ const ImportacaoInterativa = () => {
       <CardContent>
         {estatisticasFinais && (
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-green-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-green-600">
+            <div className="bg-success/10 p-4 rounded-lg text-center border border-success/20">
+              <div className="text-2xl font-bold text-success">
                 {estatisticasFinais.criados}
               </div>
               <div className="text-sm">Usuários criados</div>
             </div>
-            <div className="bg-blue-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-blue-600">
+            <div className="bg-primary/10 p-4 rounded-lg text-center border border-primary/20">
+              <div className="text-2xl font-bold text-primary">
                 {estatisticasFinais.atualizados}
               </div>
               <div className="text-sm">Usuários atualizados</div>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-gray-600">
+            <div className="bg-muted p-4 rounded-lg text-center border border-border">
+              <div className="text-2xl font-bold text-muted-foreground">
                 {estatisticasFinais.ignorados}
               </div>
               <div className="text-sm">Ignorados</div>
             </div>
-            <div className="bg-red-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-red-600">
+            <div className="bg-destructive/10 p-4 rounded-lg text-center border border-destructive/20">
+              <div className="text-2xl font-bold text-destructive">
                 {estatisticasFinais.erros}
               </div>
               <div className="text-sm">Erros</div>
@@ -887,9 +1012,9 @@ const ImportacaoInterativa = () => {
                     <div key={index} className="bg-gray-50 p-3 rounded">
                       <div className="font-medium">{diff.label}:</div>
                       <div className="text-sm">
-                        <span className="text-red-600">Atual: {diff.valorAtual || '(vazio)'}</span>
+                        <span className="text-destructive">Atual: {diff.valorAtual || '(vazio)'}</span>
                         <br />
-                        <span className="text-green-600">Novo: {diff.valorNovo || '(vazio)'}</span>
+                        <span className="text-success">Novo: {diff.valorNovo || '(vazio)'}</span>
                       </div>
                     </div>
                   ))}

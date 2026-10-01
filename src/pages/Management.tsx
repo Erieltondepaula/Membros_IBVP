@@ -3,6 +3,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { filterMembers, calculateAge } from '@/utils/memberUtils';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
+import { Button } from '@/components/ui/button';
+import ActiveNoAvatarModal from '@/components/ActiveNoAvatarModal';
 import { MemberFilters as MemberFiltersComponent } from '@/components/dashboard/MemberFilters';
 import { MemberList } from '@/components/dashboard/MemberList';
 import { ImportExport } from '@/components/dashboard/ImportExport';
@@ -11,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Member } from '@/types/member';
 
 const Management = () => {
-  const { members, filters, onFiltersChange, onImport, onReplaceAll, onMemberUpdate, onRefresh, isLoading } = useAppContext();
+  const { members, filters, onFiltersChange, onImport, onReplaceAll, onMemberUpdate, onMemberDelete, onRefresh, isLoading } = useAppContext();
   const memberListRef = useRef<HTMLDivElement>(null);
   
   // ✅ ESTADO E LÓGICA DE ORDENAÇÃO MOVIDOS PARA CÁ
@@ -97,9 +99,21 @@ const Management = () => {
     memberListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const handleDownloadActiveNoAvatarPdf = () => {
+    // Abrir rota que retorna PDF
+    // abrir modal em vez de abrir direto
+    setModalOpen(true);
+  };
+
+  const [modalOpen, setModalOpen] = useState(false);
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button onClick={() => setModalOpen(true)} className="bg-primary">Análise: Ativos sem avatar</Button>
+      </div>
       <SummaryCards ageDistribution={ageDistribution} onAgeGroupClick={handleAgeGroupClick} />
+      <ActiveNoAvatarModal open={modalOpen} onOpenChange={setModalOpen} />
       <ImportExport 
         members={members} 
         // ✅ PASSA A LISTA JÁ ORDENADA PARA A EXPORTAÇÃO
@@ -118,6 +132,7 @@ const Management = () => {
           // ✅ PASSA A LISTA JÁ ORDENADA PARA A TABELA
           members={sortedMembers}
           onMemberUpdate={onMemberUpdate}
+          onMemberDelete={onMemberDelete}
           onRefresh={onRefresh}
           // ✅ PASSA AS PROPRIEDADES DE ORDENAÇÃO
           sortField={sortField}

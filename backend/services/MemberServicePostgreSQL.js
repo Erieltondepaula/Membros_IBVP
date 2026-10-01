@@ -1,14 +1,29 @@
 ﻿const db = require('../config/postgresql');
 
 class MemberServicePostgreSQL {
+
+  getMissingRequiredFields(memberData) {
+    const situation = memberData.situacao_atual ?? memberData.situacaoAtual ?? memberData.status;
+    const requiredValues = {
+      batizado: memberData.batizado,
+      membro: memberData.membro,
+      situacao_atual: situation
+    };
+
+    return Object.entries(requiredValues)
+      .filter(([, value]) => value === undefined || value === null || String(value).trim() === '')
+      .map(([field]) => field);
+  }
+
+  validateRequiredFields(memberData) {
+    const missingFields = this.getMissingRequiredFields(memberData);
+    if (missingFields.length > 0) {
+      throw new Error(`Preencha os campos obrigatórios: ${missingFields.join(', ')}`);
+    }
+  }
   
   async getAllMembers() {
-    const sql = `SELECT id, id_externo, nome, sobrenome, nome_completo, data_nascimento,
-      idade, mes, telefone, sexo, observacoes, status_civil, conjuge,
-      parentesco, rua, numero, bairro, cidade, estado, cep,
-      batizado, membro, situacao_atual, lider, e_professor_ebq,
-      faixa_etaria, pequeno_grupo, grupo, numerodomes, avatar_url,
-      created_at, updated_at FROM membros ORDER BY nome_completo`;
+    const sql = `SELECT * FROM membros ORDER BY nome_completo`;
     
     try {
       const results = await db.query(sql);
@@ -32,6 +47,18 @@ class MemberServicePostgreSQL {
   }
 
   async importMembers(membersArray) {
+    const invalidRows = membersArray.flatMap((member, index) => {
+      const missingFields = this.getMissingRequiredFields(member);
+      if (missingFields.length === 0) return [];
+      const name = this.getNomeCompleto(member);
+      const rowLabel = name ? ` (${name})` : '';
+      return [`Linha ${index + 2}${rowLabel}: ${missingFields.join(', ')}`];
+    });
+
+    if (invalidRows.length > 0) {
+      throw new Error(`Preencha os campos obrigatórios antes de importar:\n${invalidRows.join('\n')}`);
+    }
+
     console.log(`IMPORTACAO INTELIGENTE: ${membersArray.length} membros`);
     console.log(`Preservando avatars e atualizando apenas campos diferentes...`);
     
@@ -161,7 +188,9 @@ class MemberServicePostgreSQL {
       'faixa_etaria': newData.faixaEtaria || newData.faixa_etaria,
       'pequeno_grupo': newData.pequenoGrupo || newData.pequeno_grupo,
       'grupo': newData.grupo,
-      'numerodomes': newData.numeroDomes || newData.numerodomes
+      'numerodomes': newData.numeroDomes || newData.numerodomes,
+      'avatar_url': newData.avatarUrl || newData.avatar_url,
+      'ministro': newData.ministro
     };
     
     for (const [fieldName, newValue] of Object.entries(fieldsToCheck)) {
@@ -208,6 +237,7 @@ class MemberServicePostgreSQL {
   }
 
   async insertNewMember(memberData) {
+    this.validateRequiredFields(memberData);
     const nomeCompleto = this.getNomeCompleto(memberData);
     
     try {
@@ -216,14 +246,18 @@ class MemberServicePostgreSQL {
       
       console.log(`    Novo ID: ${generatedId}`);
       
-      const insertSql = `INSERT INTO membros (id, id_externo, nome, sobrenome, nome_completo, data_nascimento,
+      const insertSql = `INSERT INTO membros (
+        id, id_externo, nome, sobrenome, nome_completo, data_nascimento,
         idade, mes, telefone, sexo, observacoes, status_civil, conjuge,
         parentesco, rua, numero, bairro, cidade, estado, cep,
         batizado, membro, situacao_atual, lider, e_professor_ebq,
-        faixa_etaria, pequeno_grupo, grupo, numerodomes, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-        $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25,
-        $26, $27, $28, $29, NOW(), NOW()) RETURNING id`;
+        faixa_etaria, pequeno_grupo, grupo, numerodomes, avatar_url, ministro,
+        created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+        $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+        $27, $28, $29, $30, $31, NOW(), NOW()
+      ) RETURNING id`;
       
       const insertParams = [
         generatedId,
@@ -254,7 +288,9 @@ class MemberServicePostgreSQL {
         memberData.faixaEtaria || memberData.faixa_etaria || null,
         memberData.pequenoGrupo || memberData.pequeno_grupo || false,
         memberData.grupo || null,
-        memberData.numeroDomes || memberData.numerodomes || null
+        memberData.numeroDomes || memberData.numerodomes || null,
+        memberData.avatarUrl || memberData.avatar_url || null,
+        memberData.ministro || false
       ];
       
       await db.execute(insertSql, insertParams);
@@ -274,6 +310,7 @@ class MemberServicePostgreSQL {
   }
 
   async updateMember(id, memberData) {
+    this.validateRequiredFields(memberData);
     const updateFields = [];
     const values = [];
     let paramIndex = 1;
@@ -289,6 +326,9 @@ class MemberServicePostgreSQL {
       'faixaEtaria': 'faixa_etaria',
       'pequenoGrupo': 'pequeno_grupo',
       'numeroDomes': 'numerodomes',
+      'motivoDesligamento': 'motivo_desligamento',
+      'dataDesligamento': 'data_desligamento',
+      'dataBatismo': 'data_batismo',
       'idExterno': 'id_externo',
       'avatarUrl': 'avatar_url',
       'avatar_url': 'avatar_url'
@@ -306,7 +346,8 @@ class MemberServicePostgreSQL {
       'telefone', 'sexo', 'observacoes', 'status_civil', 'conjuge', 
       'parentesco', 'rua', 'numero', 'bairro', 'cidade', 'estado', 'cep',
       'batizado', 'membro', 'situacao_atual', 'lider', 'e_professor_ebq',
-      'faixa_etaria', 'pequeno_grupo', 'grupo', 'numerodomes', 'avatar_url'
+      'faixa_etaria', 'pequeno_grupo', 'grupo', 'numerodomes', 'avatar_url',
+      'motivo_desligamento', 'data_desligamento', 'data_batismo'
     ];
     
     for (const field of allowedFields) {

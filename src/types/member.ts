@@ -34,6 +34,7 @@ export interface Member {
   dataBatismo?: string;
   dataMembresia?: string;
   dataDesligamento?: string;
+  motivoDesligamento?: string;
   observacoes?: string;
   createdAt: string;
   updatedAt: string;

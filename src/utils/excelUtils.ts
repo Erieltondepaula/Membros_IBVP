@@ -110,12 +110,33 @@ export const importFromExcel = (file: File): Promise<Partial<Member>[]> => {
           return reject(new Error(`Colunas obrigatórias não encontradas: ${missingColumnNames.join(', ')}.`));
         }
 
+        const getRowValue = (row: Record<string, unknown>, key: keyof typeof REQUIRED_COLUMNS_MAP): unknown => {
+          for (const alias of REQUIRED_COLUMNS_MAP[key]) {
+            if (headerMap.has(alias)) return row[headerMap.get(alias)!];
+          }
+          return undefined;
+        };
+
+        const requiredFields = ['batizado', 'membro', 'situacao_atual'] as const;
+        const invalidRows = jsonData.flatMap((row, index) => {
+          const missingFields = requiredFields.filter((field) => {
+            const value = getRowValue(row, field === 'situacao_atual' ? 'status' : field);
+            return value === undefined || value === null || String(value).trim() === '';
+          });
+          if (missingFields.length === 0) return [];
+
+          const name = String(getRowValue(row, 'nomeCompleto') || getRowValue(row, 'nome') || '').trim();
+          const rowLabel = name ? ` (${name})` : '';
+          return [`Linha ${index + 2}${rowLabel}: ${missingFields.join(', ')}`];
+        });
+
+        if (invalidRows.length > 0) {
+          return reject(new Error(`Preencha os campos obrigatórios da planilha:\n${invalidRows.join('\n')}`));
+        }
+
         const members: Partial<Member>[] = jsonData.map((row, index): Partial<Member> => {
             const getValue = (key: keyof typeof REQUIRED_COLUMNS_MAP): unknown => {
-                for (const alias of REQUIRED_COLUMNS_MAP[key]) {
-                    if (headerMap.has(alias)) return row[headerMap.get(alias)!];
-                }
-                return undefined;
+                return getRowValue(row, key);
             };
 
             const dataNascimento = parseDate(getValue('dataNascimento'));
@@ -157,7 +178,7 @@ export const importFromExcel = (file: File): Promise<Partial<Member>[]> => {
                 estado: String(getValue('estado') || ''),
                 cep: String(getValue('cep') || ''),
                 status: isAtivo(getValue('status')),
-                situacao_atual: String(getValue('status') || ''),  // ← ADICIONAR ESTE CAMPO!
+                situacao_atual: String(getValue('status') || ''),
                 batizado: isYes(getValue('batizado')),
                 membro: isYes(getValue('membro')),
                 lider: isYes(getValue('lider')),

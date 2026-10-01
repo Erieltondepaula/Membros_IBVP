@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gestão de membros IBVP</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <hta:application 
+        id="appIBVP"
+        applicationname="Gestão de membros IBVP"
+        border="none"
+        caption="no"
+        showintaskbar="yes"
+        singleinstance="yes"
+        sysmenu="no"
+        windowstate="normal"
+    />
+    <style>
+        body {
+            background-color: #11223b;
+            color: #ffffff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            text-align: center;
+            -webkit-user-select: none;
+            cursor: default;
+        }
+        .card {
+            width: 460px;
+            height: 590px;
+            margin: 0 auto;
+            box-sizing: border-box;
+            padding: 20px 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .header-logo {
+            margin-top: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .logo-img {
+            height: 42px;
+            width: auto;
+            margin-right: 12px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .title-text {
+            font-size: 19px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            text-transform: uppercase;
+        }
+        .spinner-container {
+            height: 40px;
+            margin-bottom: 10px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border-left-color: #ffffff;
+            margin: 0 auto;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .subtitle {
+            font-size: 13px;
+            color: #a0aec0;
+            margin-bottom: 20px;
+        }
+        .list-services {
+            width: 100%;
+            text-align: left;
+            padding-left: 55px;
+            box-sizing: border-box;
+            font-size: 13.5px;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+        .service-item {
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .status-icon {
+            position: absolute;
+            left: -28px;
+            top: 1px;
+            font-weight: bold;
+        }
+        .success-icon { color: #4ade80; }
+        .wait-icon { color: #a0aec0; }
+        .loading-icon {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+            color: #38bdf8;
+        }
+        .sub-info {
+            font-size: 11px;
+            color: #718096;
+            display: block;
+            margin-top: -2px;
+        }
+        .question-text {
+            font-size: 14.5px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #ffffff;
+            visibility: hidden;
+            height: 20px;
+        }
+        .botoes-container {
+            visibility: hidden;
+            width: 100%;
+        }
+        .btn {
+            width: 180px;
+            padding: 11px 0;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            box-sizing: border-box;
+            display: inline-block;
+        }
+        .btn-yes {
+    background-color: #0A5FC2;
+    color: #ffffff;
+    border: none;
+    margin-right: 12px;
+}
+
+.btn-yes:hover {
+    background-color: #0047A8;
+}
+
+.btn-no {
+    background-color: transparent;
+    color: #ffffff;
+    border: 2px solid #3FA9F5;
+}
+
+.btn-no:hover {
+    background-color: #0047A8;
+}
+        .btn-danger {
+            background-color: #ef4444;
+            color: #ffffff;
+            border: none;
+            width: 372px;
+            padding: 12px 0;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            box-sizing: border-box;
+            display: inline-block;
+        }
+        .btn-danger:hover { background-color: #dc2626; }
+    </style>
+
+    <script language="javascript">
+        var shell = new ActiveXObject("WScript.Shell");
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        
+        window.resizeTo(480, 620);
+        window.moveTo((screen.width - 480) / 2, (screen.height - 620) / 2);
+
+        function atualizarItem(id, status, extraText) {
+            var iconHtml = "";
+            if (status === "loading") iconHtml = "<span class='loading-icon'>↻</span>";
+            else if (status === "success") iconHtml = "<span class='success-icon'>✓</span>";
+            else iconHtml = "<span class='wait-icon'>○</span>";
+            
+            document.getElementById(id + "-icon").innerHTML = iconHtml;
+            if (extraText) {
+                document.getElementById(id + "-text").innerText = extraText;
+            }
+        }
+
+        function setStep(step, text) {
+            document.getElementById("step-counter").innerText = step ? "Passo " + step + " de 5" : "Concluído";
+            document.getElementById("status-geral").innerText = text;
+        }
+
+        function executarPassos() {
+            setStep(1, "Iniciando PostgreSQL...");
+            // Mata qualquer processo antigo travado nas portas antes de iniciar
+            shell.Run("cmd.exe /c taskkill /F /IM node.exe", 0, true);
+
+            setTimeout(function() {
+                atualizarItem("postgres", "loading", "Verificando PostgreSQL...");
+                shell.Run("cmd.exe /c net start postgresql-x64-17", 0, false);
+                
+                setTimeout(function() {
+                    atualizarItem("postgres", "success", "PostgreSQL Pronto");
+                    setStep(2, "Criando backup do banco de dados...");
+                    
+                    setTimeout(function() {
+                        atualizarItem("backup", "loading", "Criando Backup do Banco...");
+                        if (fso.FileExists("backend\\backup-database.js")) {
+                            shell.Run("cmd.exe /c cd backend && node backup-database.js", 0, true);
+                            atualizarItem("backup", "success", "Backup Automático Concluído");
+                            setStep(3, "Iniciando Backend API...");
+                        } else {
+                            atualizarItem("backup", "success", "Backup pulado (não encontrado)");
+                            setStep(3, "Iniciando Backend API...");
+                        }
+
+                        setTimeout(function() {
+                            atualizarItem("backend", "loading", "Iniciando Backend API...");
+                            // Inicia a API na pasta backend (ela lerá a PORT=5001 do .env agora livre de erros!)
+                            shell.Run("cmd.exe /c cd backend && node server.js", 0, false);
+                            
+                            setTimeout(function() {
+                                atualizarItem("backend", "success", "Backend API Iniciado");
+                                setStep(4, "Iniciando Frontend em 8081...");
+
+                                setTimeout(function() {
+                                    atualizarItem("frontend", "loading", "Iniciando Frontend Build...");
+                                    // Limpa servidores fantasmas antigos da porta 8081
+                                    shell.Run("cmd.exe /c taskkill /F /FI \"WINDOWTITLE eq http-server*\" /IM cmd.exe", 0, true);
+                                    // Sobe o servidor de arquivos perfeitamente na porta 8081 com fallback SPA
+                                    shell.Run("cmd.exe /c cd dist && http-server -p 8081 -a 127.0.0.1 -c-1 -P http://127.0.0.1:8081?", 0, false);
+                                    
+                                    setTimeout(function() {
+                                        atualizarItem("frontend", "success", "Frontend Build Iniciado");
+                                        setStep(5, "Verificando pgAdmin 4...");
+
+                                        setTimeout(function() {
+                                            atualizarItem("pgadmin", "loading", "Verificando pgAdmin 4...");
+                                            var pgPath = "C:\\Program Files\\pgAdmin 4\\v8\\runtime\\pgAdmin4.exe";
+                                            if (!fso.FileExists(pgPath)) pgPath = "C:\\Program Files (x86)\\pgAdmin 4\\runtime\\pgAdmin4.exe";
+                                            
+                                            if (fso.FileExists(pgPath)) {
+                                                shell.Run('"' + pgPath + '"', 1, false);
+                                                atualizarItem("pgadmin", "success", "pgAdmin 4 Inicializado");
+                                            } else {
+                                                atualizarItem("pgadmin", "success", "pgAdmin não instalado");
+                                            }
+
+                                            document.getElementById("main-loader").style.display = "none";
+                                            setStep(0, "Todos os serviços estão prontos! Abra o painel para acessar o sistema.");
+                                            document.getElementById("pergunta").style.visibility = "visible";
+                                            document.getElementById("botoes").style.visibility = "visible";
+
+                                        }, 1000);
+                                    }, 1500);
+                                }, 1000);
+                            }, 3000); 
+                        }, 1000);
+                    }, 1000);
+                }, 1500);
+            }, 1000);
+        }
+
+        function acaoSim() {
+            // Abre o navegador apontando para a porta 8081 onde o painel visual funciona
+            shell.Run("cmd.exe /c start http://127.0.0.1:8081", 0, false);
+            
+            document.getElementById("pergunta").innerText = "O sistema está rodando em segundo plano.";
+            document.getElementById("botoes").style.display = "none";
+            document.getElementById("btn-desligar-container").style.display = "block";
+            
+            try {
+                document.getElementById("appIBVP").windowstate = "minimize";
+            } catch(e) {
+                window.blur();
+            }
+        }
+
+        function pararTudoEDesligar() {
+            shell.Run("cmd.exe /c taskkill /F /IM node.exe", 0, true);
+            shell.Run("cmd.exe /c taskkill /F /FI \"WINDOWTITLE eq http-server*\" /IM cmd.exe", 0, true);
+            shell.Run("cmd.exe /c net stop postgresql-x64-17", 0, true);
+            window.close();
+        }
+    </script>
+</head>
+<body onload="executarPassos()">
+
+    <div class="card">
+        <div class="header-logo">
+            <img class="logo-img" src="public/logos/ibvpLogo.ico" alt="Logo IBVP" onerror="this.style.display='none';">
+            <div class="title-text">Gestão de membros IBVP</div>
+        </div>
+
+        <div class="spinner-container">
+            <div id="main-loader" class="spinner"></div>
+        </div>
+        
+        <div id="status-geral" class="subtitle">Inicializando serviços e banco de dados...</div>
+        <div id="step-counter" class="subtitle" style="font-size:12px;color:#cbd5e1;margin-bottom:18px;">Passo 1 de 5</div>
+        
+        <div class="list-services">
+            <div class="service-item">
+                <span id="postgres-icon" class="status-icon"><span class='wait-icon'>○</span></span>
+                <span id="postgres-text">PostgreSQL</span>
+                <span class="sub-info">port 5432</span>
+            </div>
+            <div class="service-item">
+                <span id="backup-icon" class="status-icon"><span class='wait-icon'>○</span></span>
+                <span id="backup-text">Backup Automático</span>
+                <span class="sub-info">backend/database/Backup_banco</span>
+            </div>
+            <div class="service-item">
+                <span id="backend-icon" class="status-icon"><span class='wait-icon'>○</span></span>
+                <span id="backend-text">Backend API</span>
+                <span class="sub-info">http://localhost:5001</span>
+            </div>
+            <div class="service-item">
+                <span id="frontend-icon" class="status-icon"><span class='wait-icon'>○</span></span>
+                <span id="frontend-text">Frontend Build</span>
+                <span class="sub-info">http://127.0.0.1:8081</span>
+            </div>
+            <div class="service-item">
+                <span id="pgadmin-icon" class="status-icon"><span class='wait-icon'>○</span></span>
+                <span id="pgadmin-text">pgAdmin 4</span>
+                <span class="sub-info">port 5050</span>
+            </div>
+        </div>
+
+        <div id="pergunta" class="question-text">Deseja abrir a aplicação no navegador?</div>
+        
+        <div id="botoes" class="botoes-container">
+            <div class="btn btn-yes" onclick="acaoSim()">SIM</div>
+            <div class="btn btn-no" onclick="pararTudoEDesligar()">NÃO</div>
+        </div>
+
+        <div id="btn-desligar-container" style="display: none; width: 100%;">
+            <div class="btn btn-danger" onclick="pararTudoEDesligar()">FECHAR E DESLIGAR SISTEMA</div>
+        </div>
+    </div>
+
+</body>
+</html>

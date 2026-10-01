@@ -1,0 +1,1 @@
+CreateObject("Wscript.Shell").Run "interface.hta", 1, False

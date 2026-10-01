@@ -11,6 +11,11 @@ function toBoolean(val) {
   return !!val;
 }
 
+function toRequiredBoolean(val) {
+  if (val === undefined || val === null || String(val).trim() === '') return null;
+  return toBoolean(val);
+}
+
 function splitNome(nome) {
   if (!nome) return { nome: '', sobrenome: '' };
   const partes = nome.trim().split(' ');
@@ -75,15 +80,16 @@ router.post('/importar', upload.single('arquivo'), async (req, res) => {
         cidade: item.cidade,
         estado: item.estado,
         cep: item.cep,
-        batizado: toBoolean(item.batizado),
-        membro: toBoolean(item.membro),
+        batizado: toRequiredBoolean(item.batizado),
+        membro: toRequiredBoolean(item.membro),
         situacao_atual: item.situacao_atual,
         lider: toBoolean(item.e_lider),
         e_professor_ebq: toBoolean(item.e_professor_ebq),
         faixa_etaria: item.faixa_etaria,
         pequeno_grupo: toBoolean(item['Está em um pequeno grupo ?']),
         grupo: item.grupo,
-        numerodomes: item.numerodomes
+        numerodomes: item.numerodomes,
+        avatar_url: item.avatar_url || item.avatarUrl || ''
       };
     });
 

@@ -15,6 +15,7 @@ export interface AppContextType {
   onImport: (members: Partial<Member>[]) => Promise<boolean>;
   onReplaceAll: (members: Partial<Member>[]) => Promise<boolean>;
   onMemberUpdate: (member: Member) => Promise<void>;
+  onMemberDelete: (memberId: string) => void;
   onRefresh: () => void;
 }
 
@@ -156,6 +157,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Membro atualizado com sucesso!" });
   };
 
+  const onMemberDelete = (memberId: string) => {
+    setMembers(prevMembers => prevMembers.filter(member => member.id !== memberId));
+  };
+
   const onImport = async (importedMembers: Partial<Member>[]): Promise<boolean> => {
     setIsLoading(true);
     try {
@@ -240,6 +245,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     onImport,
     onReplaceAll,
     onMemberUpdate,
+    onMemberDelete,
     onRefresh
   };
 

@@ -235,11 +235,11 @@ export const ConversorPage = () => {
               </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
-              <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+            <div className="bg-muted rounded-lg p-4 mt-4 border border-border">
+              <h4 className="font-semibold text-foreground mb-2">
                 O que o conversor faz:
               </h4>
-              <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>✅ Separa nome e sobrenome automaticamente</li>
                 <li>✅ Formata datas para DD/MM/YYYY</li>
                 <li>✅ Preserva o ID original como "id_externo"</li>
