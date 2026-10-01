@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { apiUrl } from '@/lib/api';
 
 interface MemberBrief {
   id: string;
@@ -17,8 +18,7 @@ export const ActiveNoAvatarModal = ({ open, onOpenChange }: { open: boolean; onO
     if (!open) return;
     setLoading(true);
     setError(null);
-    const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5001';
-    const url = `${API_BASE}/api/members/ativos-sem-avatar`;
+    const url = apiUrl('/api/members/ativos-sem-avatar');
     fetch(url)
       .then(res => {
         if (!res.ok) throw new Error(`Falha ao carregar: ${res.status}`);
@@ -63,8 +63,7 @@ export const ActiveNoAvatarModal = ({ open, onOpenChange }: { open: boolean; onO
         <DialogFooter>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => {
-              const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5001';
-              window.open(`${API_BASE}/api/members/ativos-sem-avatar/pdf`, '_blank');
+              window.open(apiUrl('/api/members/ativos-sem-avatar/pdf'), '_blank');
             }}>Baixar PDF</Button>
             <Button onClick={() => {
               const csv = ['nome,id,telefone', ...members.map(m => `"${(m.nomeCompleto||'').replace(/"/g,'""')}",${m.id},${m.telefone||''}`)].join('\n');

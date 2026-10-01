@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Church, Edit, Check, Users, UserCheck, UserX, Heart } from 'lucide-react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Member } from '@/types/member';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 
 interface HeaderProps {
   members: Member[];
@@ -24,12 +25,12 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
   useEffect(() => {
     const loadChurchSettings = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/church-settings');
+        const response = await fetch(apiUrl('/api/church-settings'));
         if (response.ok) {
           const settings = await response.json();
           if (settings.logo_url && !logoUrl) {
             // Se existe logo no banco mas não no localStorage, sincronizar
-            const fullUrl = `http://localhost:5001${settings.logo_url}`;
+            const fullUrl = apiAssetUrl(settings.logo_url);
             setLogoUrl(fullUrl);
             console.log('✅ Logo sincronizado do banco:', fullUrl);
           }
@@ -84,7 +85,7 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
       console.log('🔄 Enviando logo para o servidor...');
       
       // Upload para /logos
-      const uploadRes = await fetch('http://localhost:5001/api/upload-church-logo', {
+      const uploadRes = await fetch(apiUrl('/api/upload-church-logo'), {
         method: 'POST',
         body: formData,
       });
@@ -97,18 +98,18 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
       console.log('✅ Logo enviada:', uploadData);
       
       if (uploadData.logo_url) {
-        const fullUrl = `http://localhost:5001${uploadData.logo_url}`;
+        const fullUrl = apiAssetUrl(uploadData.logo_url);
         setLogoUrl(fullUrl);
         console.log('✅ Logo URL atualizada:', fullUrl);
 
         // Salvar no banco de dados church_settings
         try {
-          const settingsRes = await fetch('http://localhost:5001/api/church-settings');
+          const settingsRes = await fetch(apiUrl('/api/church-settings'));
           if (settingsRes.ok) {
             const settings = await settingsRes.json();
             
             // Atualizar com novo logo_url
-            const updateRes = await fetch('http://localhost:5001/api/church-settings', {
+            const updateRes = await fetch(apiUrl('/api/church-settings'), {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...settings, logo_url: uploadData.logo_url })
@@ -133,9 +134,9 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
 
   return (
     <Card className="rounded-xl shadow-md p-4 bg-card">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         {/* Logo e Nome da Igreja */}
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4">
           <div className="relative group flex-shrink-0">
             {logoUrl ? (
               <img src={logoUrl} alt="Logo" className="w-16 h-16 aspect-square rounded-full object-cover object-center border-2 border-primary" />
@@ -157,7 +158,7 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
               </div>
             ) : (
               <div className="flex items-center gap-2 group/title">
-                <h1 className="text-2xl font-bold text-foreground">{churchName}</h1>
+                <h1 className="break-words text-xl font-bold text-foreground sm:text-2xl">{churchName}</h1>
                 <Button size="icon" variant="ghost" className="opacity-0 group-hover/title:opacity-100 transition-opacity" onClick={() => setIsEditingName(true)}>
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -168,9 +169,9 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
         </div>
 
         {/* Cards de Estatísticas */}
-        <div className="flex items-center justify-end gap-3">
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 xl:flex xl:items-center xl:justify-end xl:gap-3">
           {/* Card de Batismo */}
-          <Card className="min-w-[180px]">
+          <Card className="col-span-2 min-w-0 sm:col-span-1 xl:min-w-[180px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Status de Batismo</CardTitle>
               <Heart className="h-5 w-5 text-primary" />
@@ -188,7 +189,7 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
           </Card>
         
           {/* Card de Gênero */}
-          <Card className="min-w-[180px]">
+          <Card className="col-span-2 min-w-0 sm:col-span-1 xl:min-w-[180px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Gênero (Ativos)</CardTitle>
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -205,18 +206,18 @@ export const Header = ({ members, onCardClick }: HeaderProps) => {
             </CardContent>
           </Card>
           
-          <div className="border-l h-16 border-border mx-1"></div>
+          <div className="hidden border-l h-16 border-border mx-1 xl:block"></div>
 
           {/* Cards de Status */}
-          <Card onClick={() => onCardClick(undefined)} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px] text-center">
+          <Card onClick={() => onCardClick(undefined)} className="min-w-0 cursor-pointer text-center transition-colors hover:bg-muted/50 xl:min-w-[120px]">
             <CardHeader className="p-4 pb-2"><CardTitle className="text-sm font-medium">Total</CardTitle></CardHeader>
             <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{stats.totalMembros}</div></CardContent>
           </Card>
-          <Card onClick={() => onCardClick('ativo')} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px] text-center">
+          <Card onClick={() => onCardClick('ativo')} className="min-w-0 cursor-pointer text-center transition-colors hover:bg-muted/50 xl:min-w-[120px]">
             <CardHeader className="p-4 pb-2"><CardTitle className="text-sm font-medium text-success">Ativos</CardTitle></CardHeader>
             <CardContent className="p-4 pt-0"><div className="text-2xl font-bold text-success">{stats.ativos}</div></CardContent>
           </Card>
-          <Card onClick={() => onCardClick('desligado')} className="cursor-pointer hover:bg-muted/50 transition-colors min-w-[120px] text-center">
+          <Card onClick={() => onCardClick('desligado')} className="min-w-0 cursor-pointer text-center transition-colors hover:bg-muted/50 xl:min-w-[120px]">
             <CardHeader className="p-4 pb-2"><CardTitle className="text-sm font-medium text-destructive">Desligados</CardTitle></CardHeader>
             <CardContent className="p-4 pt-0"><div className="text-2xl font-bold text-destructive">{stats.desligados}</div></CardContent>
           </Card>

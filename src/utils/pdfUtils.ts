@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Member, MemberFilters } from '@/types/member';
 import { calculateAge, getMemberType } from './memberUtils';
+import { apiAssetUrl } from '@/lib/api';
 
 const generateReportTitle = (filters: MemberFilters): string => {
   const descriptions: string[] = [];
@@ -326,7 +327,7 @@ export const exportToPDF = async (
 
     const avatarUrl = member.avatar_url.startsWith('http')
       ? member.avatar_url
-      : `http://localhost:5001${member.avatar_url}`;
+      : apiAssetUrl(member.avatar_url);
     return createCircularAvatarImage(avatarUrl, initial);
   }));
   

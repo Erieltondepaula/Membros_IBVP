@@ -2,12 +2,13 @@ import React, { useMemo, useRef, useState } from 'react';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { MemberFilters as MemberFiltersComponent } from '@/components/dashboard/MemberFilters';
 import { MemberList } from '@/components/dashboard/MemberList';
+import { ImportExport } from '@/components/dashboard/ImportExport';
 import { useAppContext } from '@/contexts/useAppContext';
 import { filterMembers, calculateAge, getAgeGroup, getMemberType } from '@/utils/memberUtils';
 import { Member } from '@/types/member';
 
 const Index = () => {
-  const { members, filters, onFiltersChange, onMemberUpdate, onMemberDelete } = useAppContext();
+  const { members, filters, onFiltersChange, onMemberUpdate, onMemberDelete, onImport, onReplaceAll } = useAppContext();
   const [sortField, setSortField] = useState<keyof Member | 'idade' | 'tipo' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const memberListRef = useRef<HTMLDivElement>(null);
@@ -129,14 +130,18 @@ const Index = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto p-6 space-y-6" style={{ pointerEvents: 'auto', opacity: 1 }}>
-        <div className="w-full text-center my-6">
-          <span style={{ color: '#fff', fontWeight: 700, fontSize: '2.5rem', letterSpacing: '0.01em', fontFamily: 'inherit', textShadow: '0 2px 8px #0008' }}>
-            Sistema de gestão e controle de cadastro de membros
-          </span>
+      <div className="container mx-auto space-y-6 p-3 sm:p-6" style={{ pointerEvents: 'auto', opacity: 1 }}>
+        <div className="my-3 w-full text-center sm:my-6">
+          <h1 className="text-xl font-semibold text-white sm:text-2xl">
+            <span className="sm:hidden">Gestão de membros</span>
+            <span className="hidden sm:inline">Sistema de gestão e controle de cadastro de membros</span>
+          </h1>
         </div>
         <div className="w-full mb-8 z-0">
           <SummaryCards ageDistribution={ageDistribution} onAgeGroupClick={handleChartClick} />
+        </div>
+        <div className="hidden md:block">
+          <ImportExport members={members} filteredMembers={sortedMembers} filters={filters} onImport={onImport} onReplaceAll={onReplaceAll} />
         </div>
         <MemberFiltersComponent
           filters={filters}

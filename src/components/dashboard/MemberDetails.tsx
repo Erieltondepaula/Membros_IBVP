@@ -62,7 +62,7 @@ export const MemberDetails = ({ member, onMemberUpdate }: MemberDetailsProps) =>
                 </div>
               )}
               {onMemberUpdate && (
-                <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                <div className="absolute inset-0 hidden rounded-full bg-black/50 opacity-0 transition-opacity hover:opacity-100 md:flex md:cursor-pointer md:items-center md:justify-center">
                   <label htmlFor="photo-upload" className="cursor-pointer flex items-center gap-1 text-white">
                     <Upload className="h-4 w-4" />
                     <Input
@@ -195,7 +195,7 @@ export const MemberDetails = ({ member, onMemberUpdate }: MemberDetailsProps) =>
 
             {/* Botões de ação */}
             {onMemberUpdate && (
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="hidden gap-2 border-t pt-4 md:flex">
                 <Button
                   onClick={() => setIsEditModalOpen(true)}
                   className="bg-primary text-primary-foreground hover:opacity-95 rounded-xl"

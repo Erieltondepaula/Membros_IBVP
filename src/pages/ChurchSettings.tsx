@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Settings, Save, Church } from 'lucide-react';
 import { ChurchSettings as ChurchSettingsType } from '@/types/churchSettings';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 
 export const ChurchSettings = () => {
   const { toast } = useToast();
@@ -30,7 +31,7 @@ export const ChurchSettings = () => {
 
   const loadSettings = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/church-settings');
+      const response = await fetch(apiUrl('/api/church-settings'));
       
       if (response.ok) {
         const data = await response.json();
@@ -58,7 +59,7 @@ export const ChurchSettings = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch('http://localhost:5001/api/church-settings', {
+      const response = await fetch(apiUrl('/api/church-settings'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -126,7 +127,7 @@ export const ChurchSettings = () => {
             <div className="flex items-center gap-4">
               {settings.logo_url ? (
                 <img 
-                  src={`http://localhost:5001${settings.logo_url}`} 
+                  src={apiAssetUrl(settings.logo_url)}
                   alt="Logo da Igreja" 
                   className="w-20 h-20 object-contain border rounded"
                 />
@@ -303,7 +304,7 @@ export const ChurchSettings = () => {
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 {settings.logo_url ? (
                   <img 
-                    src={`http://localhost:5001${settings.logo_url}`}
+                    src={apiAssetUrl(settings.logo_url)}
                     alt="Logo"
                     style={{ width: '50px', height: '50px', marginRight: '15px', objectFit: 'contain' }}
                   />

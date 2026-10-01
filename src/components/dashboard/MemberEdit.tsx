@@ -17,6 +17,7 @@ import { AvatarCropDialog } from '@/components/ui/AvatarCropDialog';
 import { MemberRegistrationForm } from './MemberRegistrationForm';
 import { createRoot } from 'react-dom/client';
 import { generateMemberCard, CardData } from '@/utils/cardGenerator';
+import { API_ORIGIN, apiAssetUrl, apiUrl } from '@/lib/api';
 
 interface MemberEditProps {
   member: Member | null;
@@ -100,8 +101,8 @@ export const MemberEdit = ({ member, isOpen, onClose, onSave }: MemberEditProps)
       const cepNumbers = data.cep?.replace(/\D/g, '') || '';
       
       let avatarUrl = data.avatar_url;
-      if (avatarUrl?.includes('http://localhost:5001')) {
-        avatarUrl = avatarUrl.replace('http://localhost:5001', '');
+      if (avatarUrl?.startsWith(API_ORIGIN)) {
+        avatarUrl = avatarUrl.replace(API_ORIGIN, '');
       }
       
       const updatedMember = {
@@ -113,7 +114,7 @@ export const MemberEdit = ({ member, isOpen, onClose, onSave }: MemberEditProps)
         updatedAt: new Date().toISOString(),
       };
       
-      const response = await fetch(`http://localhost:5001/api/members/${member.id}`, {
+      const response = await fetch(apiUrl(`/api/members/${member.id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +184,7 @@ export const MemberEdit = ({ member, isOpen, onClose, onSave }: MemberEditProps)
       formData.append('avatar', croppedImageBlob, 'avatar.jpg');
       formData.append('memberId', member!.id.toString());
       
-      const res = await fetch('http://localhost:5001/api/upload-avatar', {
+      const res = await fetch(apiUrl('/api/upload-avatar'), {
         method: 'POST',
         body: formData,
       });
@@ -196,7 +197,7 @@ export const MemberEdit = ({ member, isOpen, onClose, onSave }: MemberEditProps)
       const data = await res.json();
       
       if (data.avatar_url) {
-        const fullUrl = `http://localhost:5001${data.avatar_url}`;
+        const fullUrl = apiAssetUrl(data.avatar_url);
         form.setValue('avatar_url', fullUrl);
         
         toast({
@@ -345,10 +346,10 @@ export const MemberEdit = ({ member, isOpen, onClose, onSave }: MemberEditProps)
     let logoUrl = '';
     let churchName = 'IGREJA BATISTA EM VILA PALESTINA';
     try {
-      const res = await fetch('http://localhost:5001/api/church-settings');
+      const res = await fetch(apiUrl('/api/church-settings'));
       if (res.ok) {
         const settings = await res.json();
-        if (settings.logo_url) logoUrl = `http://localhost:5001${settings.logo_url}`;
+        if (settings.logo_url) logoUrl = apiAssetUrl(settings.logo_url);
         if (settings.nome) churchName = settings.nome;
       }
     } catch (e) {

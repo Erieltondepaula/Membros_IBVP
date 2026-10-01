@@ -1,8 +1,9 @@
 /**
- * ⚡ GOOGLE APPS SCRIPT - WEBHOOK EM TEMPO REAL ⚡
+ * GOOGLE APPS SCRIPT - NOTIFICAÇÕES DE ALTERAÇÃO
  * 
  * Este script deve ser instalado na sua planilha do Google Sheets
- * para enviar notificações automáticas ao sistema quando houver edições.
+ * para notificar o sistema quando houver edições. A notificação não atualiza
+ * cadastros: a planilha deve ser comparada e confirmada no painel.
  * 
  * 📋 INSTRUÇÕES DE INSTALAÇÃO:
  * 
@@ -133,7 +134,7 @@ function sincronizarManual() {
     });
     
     Logger.log('✅ Sincronização manual concluída');
-    SpreadsheetApp.getUi().alert('✅ Sincronização manual enviada com sucesso!');
+    SpreadsheetApp.getUi().alert('✅ Notificação enviada. Compare e confirme as alterações no painel para atualizar os cadastros.');
     
   } catch (error) {
     Logger.log('❌ Erro na sincronização manual: ' + error);

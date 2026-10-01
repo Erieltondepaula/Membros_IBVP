@@ -6,8 +6,8 @@ const logger = require('../config/logger');
 
 /**
  * 🔄 POST /api/webhook/google-sheets
- * Recebe notificações em tempo real quando a planilha é editada
- * Este endpoint será chamado automaticamente pelo Google Apps Script
+ * Recebe notificações em tempo real sem gravar dados no banco.
+ * A importação exige prévia e confirmação pelo painel.
  */
 router.post('/webhook/google-sheets', async (req, res) => {
   try {
@@ -25,27 +25,10 @@ router.post('/webhook/google-sheets', async (req, res) => {
       });
     }
 
-    // Responder imediatamente (200 OK) para o Google não reenviar
+    // Responder imediatamente (200 OK) para o Google não reenviar.
     res.status(200).json({
       sucesso: true,
-      mensagem: 'Webhook recebido, sincronização iniciada'
-    });
-
-    // Processar sincronização em background (não bloqueia resposta)
-    setImmediate(async () => {
-      try {
-        logger.info('🚀 Iniciando sincronização automática via webhook...');
-        
-        const resultado = await GoogleSheetsSync.syncToDatabase();
-        
-        logger.info(`✅ Sincronização webhook concluída: ${resultado.importados} membros`);
-        logger.info(`📊 Detalhes: ${JSON.stringify(resultado)}`);
-        
-        // Aqui você pode adicionar notificação em tempo real via WebSocket
-        // ou enviar email/notificação para administradores
-      } catch (error) {
-        logger.error(`❌ Erro na sincronização webhook: ${error.message}`);
-      }
+      mensagem: 'Notificação recebida. Nenhum dado foi alterado; confirme as atualizações pelo painel.'
     });
 
   } catch (error) {
@@ -59,19 +42,17 @@ router.post('/webhook/google-sheets', async (req, res) => {
 
 /**
  * 🔄 POST /api/sync/google-sheets
- * Sincronização manual sob demanda
- * Chamado quando o usuário clica no botão "Sincronizar"
+ * Compatibilidade com clientes antigos: apenas gera prévia, sem gravar.
  */
 router.post('/sync/google-sheets', async (req, res) => {
   try {
-    logger.info('🔄 Sincronização manual iniciada pelo usuário');
+    logger.info('🔎 Prévia manual solicitada por cliente legado');
 
-    const resultado = await GoogleSheetsSync.syncToDatabase();
+    const resultado = await GoogleSheetsSync.previewSync();
 
     res.json({
-      sucesso: true,
-      mensagem: 'Sincronização concluída com sucesso!',
-      dados: resultado
+      ...resultado,
+      mensagem: 'Prévia pronta. Confirme as alterações pelo painel para gravar.'
     });
 
   } catch (error) {
@@ -81,6 +62,37 @@ router.post('/sync/google-sheets', async (req, res) => {
       erro: error.message,
       mensagem: error.message || 'Falha ao sincronizar com Google Sheets'
     });
+  }
+});
+
+/**
+ * Compara a planilha com o banco sem alterar nenhum cadastro.
+ */
+router.post('/sync/google-sheets/preview', async (req, res) => {
+  try {
+    const resultado = await GoogleSheetsSync.previewSync();
+    res.json(resultado);
+  } catch (error) {
+    logger.error(`❌ Erro ao comparar Google Sheets: ${error.message}`);
+    res.status(400).json({ sucesso: false, mensagem: error.message });
+  }
+});
+
+/**
+ * Aplica somente a prévia que o usuário confirmou.
+ */
+router.post('/sync/google-sheets/apply', async (req, res) => {
+  try {
+    const { previewId } = req.body;
+    if (!previewId) {
+      return res.status(400).json({ sucesso: false, mensagem: 'A prévia de sincronização é obrigatória.' });
+    }
+
+    const resultado = await GoogleSheetsSync.applyPreview(previewId);
+    res.json({ ...resultado, mensagem: 'Atualizações aplicadas com sucesso.' });
+  } catch (error) {
+    logger.error(`❌ Erro ao aplicar prévia do Google Sheets: ${error.message}`);
+    res.status(400).json({ sucesso: false, mensagem: error.message });
   }
 });
 

@@ -19,12 +19,9 @@ cd backend
 start "Node-Backend" /b node server.js
 cd ..
 
-echo [4/4] Iniciando o Frontend na porta CORRETA (8080)...
-cd dist
-:: O comando força o http-server a rodar estritamente na porta 8080 voltado para a pasta dist
-:: Usa proxy de fallback para servir index.html em rotas SPA como /importacao
-start "http-server" /b http-server -p 8080 -a 127.0.0.1 -c-1 -P http://127.0.0.1:8080?
-cd ..
+echo [4/4] Iniciando o Frontend na porta da rede (8081)...
+:: O HTA controla o ciclo do servidor; publicar o build na LAN sem criar outra instancia
+start "http-server" /b cmd /c "cd /d %~dp0dist && http-server -p 8081 -a 0.0.0.0 -c-1 -P http://127.0.0.1:8081?"
 
 echo.
 echo ==========================================

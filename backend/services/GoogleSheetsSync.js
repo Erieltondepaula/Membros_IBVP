@@ -1,11 +1,13 @@
 // Serviço de Sincronização com Google Sheets em Tempo Real
 const axios = require('axios');
 const logger = require('../config/logger');
+const { randomUUID } = require('crypto');
 
 class GoogleSheetsSync {
   constructor() {
     const defaultSheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRdZMkpYxYB5uydpPPPhJWL0uPyBa44JOWzSyDQxcKof3mAbfvOCk2c9nZOiOFkRz7convCRILjtzuH/pub?gid=2093457985&single=true&output=csv';
     this.sheetUrl = this.normalizeSheetUrl(process.env.GOOGLE_SHEETS_URL || defaultSheetUrl);
+    this.pendingPreviews = new Map();
   }
 
   normalizeSheetUrl(rawUrl) {
@@ -192,6 +194,21 @@ class GoogleSheetsSync {
     return '';
   }
 
+  normalizeSheetDate(value) {
+    if (value === undefined || value === null || String(value).trim() === '') return '';
+    const text = String(value).trim();
+    const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2, '0')}-${String(isoMatch[3]).padStart(2, '0')}`;
+    }
+
+    const brazilianMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (brazilianMatch) {
+      return `${brazilianMatch[3]}-${String(brazilianMatch[2]).padStart(2, '0')}-${String(brazilianMatch[1]).padStart(2, '0')}`;
+    }
+    return text;
+  }
+
   /**
    * Converte dados do Google Sheets para formato do banco
    */
@@ -237,7 +254,7 @@ class GoogleSheetsSync {
           nome,
           sobrenome,
           nome_completo: nomeCompleto,
-          data_nascimento: this.getRowValue(row, ['Data de Nascimento', 'data_nascimento', 'Data Nascimento', 'data_nasc']),
+          data_nascimento: this.normalizeSheetDate(this.getRowValue(row, ['Data de Nascimento', 'data_nascimento', 'Data Nascimento', 'data_nasc'])),
           idade: parseInt(this.getRowValue(row, ['Idade', 'idade']), 10) || null,
           mes: this.getRowValue(row, ['Mês', 'mes', 'Mes']),
           telefone: this.getRowValue(row, ['Telefone', 'telefone', 'Celular', 'celular']),
@@ -274,6 +291,105 @@ class GoogleSheetsSync {
     return membros;
   }
 
+  async getMembersFromSheet() {
+    const csvData = await this.fetchSheetData();
+    const parsedData = this.parseCSV(csvData);
+    const invalidRows = parsedData.flatMap((row, index) => {
+      const missingFields = ['batizado', 'membro', 'situacao_atual'].filter((field) => {
+        const aliases = field === 'situacao_atual'
+          ? ['Situação Atual', 'situacao_atual', 'Status', 'status']
+          : [field === 'batizado' ? 'Batizado' : 'Membro', field];
+        return String(this.getRowValue(row, aliases) ?? '').trim() === '';
+      });
+      if (missingFields.length === 0) return [];
+
+      const name = this.getRowValue(row, ['Nome', 'Nome Completo', 'nome', 'nome_completo']);
+      return [`Linha ${index + 2}${name ? ` (${name})` : ''}: ${missingFields.join(', ')}`];
+    });
+
+    if (invalidRows.length > 0) {
+      throw new Error(`Preencha os campos obrigatórios da planilha Google Sheets:\n${invalidRows.join('\n')}`);
+    }
+
+    const members = this.transformToMembers(parsedData);
+    if (members.length === 0) {
+      throw new Error('Nenhum membro válido encontrado na planilha');
+    }
+    return members;
+  }
+
+  async previewSync() {
+    const MemberService = require('./MemberServicePostgreSQL');
+    const members = await this.getMembersFromSheet();
+    const changes = [];
+    let newMembers = 0;
+    let updatedMembers = 0;
+    let unchangedMembers = 0;
+
+    for (const memberData of members) {
+      const existingMember = await MemberService.findExistingMember(memberData);
+      const memberChanges = MemberService.getImportFieldChanges(existingMember || {}, memberData);
+
+      if (!existingMember) newMembers++;
+      else if (memberChanges.length > 0) updatedMembers++;
+      else unchangedMembers++;
+
+      if (memberChanges.length > 0) {
+        changes.push({
+          nome: MemberService.getNomeCompleto(memberData),
+          acao: existingMember ? 'atualizado' : 'novo',
+          ultima_atualizacao: existingMember?.updated_at
+            ? new Date(existingMember.updated_at).toISOString()
+            : null,
+          campos: memberChanges.map(change => ({
+            campo: change.label,
+            atual: change.currentValue,
+            novo: change.newValue
+          }))
+        });
+      }
+    }
+
+    const now = Date.now();
+    for (const [id, preview] of this.pendingPreviews.entries()) {
+      if (now - preview.createdAt > 15 * 60 * 1000) this.pendingPreviews.delete(id);
+    }
+
+    const previewId = randomUUID();
+    this.pendingPreviews.set(previewId, { members, createdAt: now });
+
+    return {
+      sucesso: true,
+      previewId,
+      total_processados: members.length,
+      novos: newMembers,
+      atualizados: updatedMembers,
+      sem_alteracao: unchangedMembers,
+      alteracoes: changes
+    };
+  }
+
+  async applyPreview(previewId) {
+    const pendingPreview = this.pendingPreviews.get(previewId);
+    if (!pendingPreview || Date.now() - pendingPreview.createdAt > 15 * 60 * 1000) {
+      this.pendingPreviews.delete(previewId);
+      throw new Error('A prévia expirou. Compare a planilha novamente antes de atualizar.');
+    }
+
+    const MemberService = require('./MemberServicePostgreSQL');
+    const results = await MemberService.importMembers(pendingPreview.members);
+    this.pendingPreviews.delete(previewId);
+
+    return {
+      sucesso: true,
+      total_processados: pendingPreview.members.length,
+      importados: results.filter(result => result.success && result.action === 'inserted').length,
+      atualizados: results.filter(result => result.success && result.action === 'updated').length,
+      erros: results.filter(result => !result.success),
+      timestamp: new Date().toISOString()
+    };
+  }
+
   /**
    * Sincroniza dados completos da planilha com o banco
    */
@@ -282,37 +398,7 @@ class GoogleSheetsSync {
     
     try {
       logger.info('🚀 Iniciando sincronização completa com Google Sheets...');
-      
-      // 1. Buscar dados da planilha
-      const csvData = await this.fetchSheetData();
-      
-      // 2. Parsear CSV
-      const parsedData = this.parseCSV(csvData);
-
-      const invalidRows = parsedData.flatMap((row, index) => {
-        const missingFields = ['batizado', 'membro', 'situacao_atual'].filter((field) => {
-          const aliases = field === 'situacao_atual'
-            ? ['Situação Atual', 'situacao_atual', 'Status', 'status']
-            : [field === 'batizado' ? 'Batizado' : 'Membro', field];
-          return String(this.getRowValue(row, aliases) ?? '').trim() === '';
-        });
-        if (missingFields.length === 0) return [];
-
-        const name = this.getRowValue(row, ['Nome', 'Nome Completo', 'nome', 'nome_completo']);
-        const rowLabel = name ? ` (${name})` : '';
-        return [`Linha ${index + 2}${rowLabel}: ${missingFields.join(', ')}`];
-      });
-
-      if (invalidRows.length > 0) {
-        throw new Error(`Preencha os campos obrigatórios da planilha Google Sheets:\n${invalidRows.join('\n')}`);
-      }
-      
-      // 3. Transformar para formato do banco
-      const membros = this.transformToMembers(parsedData);
-      
-      if (membros.length === 0) {
-        throw new Error('Nenhum membro válido encontrado na planilha');
-      }
+      const membros = await this.getMembersFromSheet();
       
       // 4. Importar para o banco (substitui tudo)
       logger.info(`📝 Importando ${membros.length} membros para o banco...`);

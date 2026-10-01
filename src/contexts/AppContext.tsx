@@ -4,8 +4,9 @@
 import { createContext, useState, useEffect, ReactNode } from 'react';
 import { Member, MemberFilters } from '@/types/member';
 import { useToast } from '@/hooks/use-toast';
+import { API_BASE_URL, apiAssetUrl } from '@/lib/api';
 
-const API_URL = 'http://localhost:5001/api/members';
+const API_URL = `${API_BASE_URL}/members`;
 
 export interface AppContextType {
   members: Member[];
@@ -50,7 +51,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           id: item.id || '',
           nome: item.nome || '',
           nomeCompleto: item.nome_completo || '',
-          avatar_url: item.avatar_url ? `http://localhost:5001${item.avatar_url}` : undefined,
+          avatar_url: item.avatar_url ? apiAssetUrl(item.avatar_url) : undefined,
           dataNascimento: item.data_nascimento || '',
           idade: item.idade || 0,
           mes: item.mes || '',
@@ -108,7 +109,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         id: item.id || '',
         nome: item.nome || '',
         nomeCompleto: item.nome_completo || '',
-        avatar_url: item.avatar_url ? `http://localhost:5001${item.avatar_url}` : undefined,
+        avatar_url: item.avatar_url ? apiAssetUrl(item.avatar_url) : undefined,
         dataNascimento: item.data_nascimento || '',
         idade: item.idade || 0,
         mes: item.mes || '',

@@ -6,6 +6,7 @@ import { Member } from '@/types/member';
 import { calculateAge } from '@/utils/memberUtils';
 import { ChurchSettings } from '@/types/churchSettings';
 import { useEffect, useState } from 'react';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 
 interface MemberRegistrationFormProps {
   member: Member;
@@ -17,7 +18,7 @@ export const MemberRegistrationForm = ({ member, churchSettings: propChurchSetti
 
   useEffect(() => {
     if (!propChurchSettings) {
-      fetch('http://localhost:5001/api/church-settings')
+      fetch(apiUrl('/api/church-settings'))
         .then(res => res.json())
         .then(data => setSettings(data))
         .catch(err => console.error('Erro ao carregar configurações:', err));
@@ -41,7 +42,7 @@ export const MemberRegistrationForm = ({ member, churchSettings: propChurchSetti
     ? `${churchSettings.cidade}, ${churchSettings.estado}, ${churchSettings.pais || 'Brasil'}`
     : 'Cariacica, ES, Brasil';
   const logoUrl = churchSettings?.logo_url 
-    ? `http://localhost:5001${churchSettings.logo_url}`
+    ? apiAssetUrl(churchSettings.logo_url)
     : null;
 
   return (
@@ -175,7 +176,7 @@ export const MemberRegistrationForm = ({ member, churchSettings: propChurchSetti
             <div style={{ flexShrink: 0 }}>
               {member.avatar_url ? (
                 <img 
-                  src={member.avatar_url.startsWith('http') ? member.avatar_url : `http://localhost:5001${member.avatar_url}`}
+                  src={apiAssetUrl(member.avatar_url)}
                   alt={member.nome}
                   style={{ width: '90px', height: '110px', objectFit: 'cover', border: '2px solid #005b7f', borderRadius: '4px' }}
                 />

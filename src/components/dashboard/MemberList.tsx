@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Eye, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Crown, GraduationCap } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import ActiveNoAvatarModal from '@/components/ActiveNoAvatarModal';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +19,7 @@ import { MemberDetails } from './MemberDetails';
 import { MemberEdit } from './MemberEdit';
 import { calculateAge, getMemberType } from '@/utils/memberUtils';
 import { exportToPDF } from '@/utils/pdfUtils';
+import { apiUrl } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -54,6 +57,14 @@ const MemberTypeBadge = ({ type }: { type: string }) => {
   return <Badge className={getVariantClass()}>{type}</Badge>;
 };
 
+const MemberFunctionBadges = ({ member }: { member: Member }) => (
+  <div className="flex flex-wrap gap-1">
+    {member.lider && <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-700"><Crown className="h-3 w-3" />Líder</Badge>}
+    {member.professorEBQ && <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-700"><GraduationCap className="h-3 w-3" />Professor EBQ</Badge>}
+    {!member.lider && !member.professorEBQ && <span className="text-sm text-muted-foreground">-</span>}
+  </div>
+);
+
 export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh, sortField, sortDirection, onSort, filters = {} }: MemberListProps) => {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -72,6 +83,7 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
   const [showPhoto, setShowPhoto] = useState(true);
   const [showBirthdayWeekday, setShowBirthdayWeekday] = useState(true);
   const [showType, setShowType] = useState(true);
+  const [showFunctions, setShowFunctions] = useState(() => localStorage.getItem('show-member-functions') !== 'false');
   const [showDisconnectionDetails, setShowDisconnectionDetails] = useState(true);
 
   const letrasAtivas = useMemo(() => {
@@ -149,7 +161,7 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
 
     setDeletingMemberId(member.id);
     try {
-      const response = await fetch(`http://localhost:5001/api/members/${member.id}`, { method: 'DELETE' });
+      const response = await fetch(apiUrl(`/api/members/${member.id}`), { method: 'DELETE' });
       if (!response.ok) throw new Error('Não foi possível remover o cadastro.');
 
       onMemberDelete(member.id);
@@ -166,9 +178,9 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
   };
 
   return (
-    <Card className="rounded-xl shadow-md">
-      <CardHeader className="space-y-4">
-        <div className="flex justify-between items-center">
+    <Card className="min-w-0 rounded-xl shadow-md">
+      <CardHeader className="space-y-4 p-4 sm:p-6">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
             Lista de Membros ({membersFiltradosPorLetra.length} registros) 
             {totalPages > 1 && (
@@ -177,25 +189,49 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
               </span>
             )}
           </CardTitle>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleOpenPdfConfig}>
+          <div className="flex w-full justify-end gap-2 sm:w-auto">
+            <Button variant="outline" size="icon" onClick={handleOpenPdfConfig} className="h-10 w-10 sm:h-9 sm:w-auto sm:px-3" aria-label="Exportar para PDF" title="Exportar para PDF">
               <FileText className="h-4 w-4 mr-2" />
-              Exportar para PDF
+              <span className="hidden sm:inline">Exportar para PDF</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setActiveNoAvatarOpen(true)}>
+            <Button variant="outline" size="icon" onClick={() => setActiveNoAvatarOpen(true)} className="h-10 w-10 sm:h-9 sm:w-auto sm:px-3" aria-label="Ativos sem avatar" title="Ativos sem avatar">
               {/* simple icon */}
               <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM11 6h2v6h-2V6zm0 8h2v2h-2v-2z" fill="currentColor"/></svg>
-              Ativos sem avatar
+              <span className="hidden sm:inline">Ativos sem avatar</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={onRefresh}>
+            <Button variant="outline" size="icon" onClick={onRefresh} className="h-10 w-10 sm:h-9 sm:w-auto sm:px-3" aria-label="Atualizar lista" title="Atualizar lista">
               <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar Lista
+              <span className="hidden sm:inline">Atualizar Lista</span>
             </Button>
+          </div>
+          <div className="hidden w-full items-center justify-between gap-3 rounded-md border px-3 py-2 md:flex md:w-auto md:justify-start">
+            <Label htmlFor="show-member-functions" className="cursor-pointer text-sm">Exibir funções</Label>
+            <Switch
+              id="show-member-functions"
+              checked={showFunctions}
+              onCheckedChange={(checked) => {
+                setShowFunctions(checked);
+                localStorage.setItem('show-member-functions', String(checked));
+              }}
+            />
           </div>
         </div>
         <ActiveNoAvatarModal open={activeNoAvatarOpen} onOpenChange={setActiveNoAvatarOpen} />
 
-        <div className="flex flex-wrap items-center gap-1 bg-muted/40 p-2 rounded-lg border">
+        <div className="md:hidden">
+          <Label htmlFor="member-letter">Filtrar por inicial</Label>
+          <Select value={selectedLetter || 'all'} onValueChange={value => handleLetterSelect(value === 'all' ? null : value)}>
+            <SelectTrigger id="member-letter" className="mt-2 w-full">
+              <SelectValue placeholder="Todas as letras" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as letras</SelectItem>
+              {alfabeto.map(letter => <SelectItem key={letter} value={letter}>{letter}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="hidden flex-wrap items-center gap-1 rounded-lg border bg-muted/40 p-2 md:flex">
           <Button
             variant={selectedLetter === null ? "default" : "ghost"}
             size="sm"
@@ -226,8 +262,8 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
         </div>
       </CardHeader>
       
-      <CardContent>
-        <div className="overflow-x-auto">
+      <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -244,6 +280,7 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
                 <TableHead className="cursor-pointer" onClick={() => onSort('tipo')}>
                   <div className="flex items-center gap-1">Tipo {getSortIcon('tipo')}</div>
                 </TableHead>
+                {showFunctions && <TableHead>Funções</TableHead>}
                 <TableHead className="cursor-pointer" onClick={() => onSort('status')}>
                   <div className="flex items-center gap-1">Status {getSortIcon('status')}</div>
                 </TableHead>
@@ -288,14 +325,15 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
                   </TableCell>
                   <TableCell>{calculateAge(member.dataNascimento)} anos</TableCell>
                   <TableCell><MemberTypeBadge type={getMemberType(member)} /></TableCell>
+                  {showFunctions && <TableCell><MemberFunctionBadges member={member} /></TableCell>}
                   <TableCell>
                     <Badge variant={member.status === 'ativo' ? 'default' : 'secondary'}>
                       {member.status === 'ativo' ? 'Ativo' : 'Desligado'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleViewDetails(member)}><Eye className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleEditClick(member)}><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleViewDetails(member)} aria-label={`Ver ${member.nomeCompleto || member.nome}`}><Eye className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleEditClick(member)} aria-label={`Editar ${member.nomeCompleto || member.nome}`}><Edit className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => handleDeleteMember(member)} disabled={deletingMemberId === member.id} aria-label={`Remover ${member.nomeCompleto || member.nome}`} title="Remover cadastro">
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -305,18 +343,49 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
             </TableBody>
           </Table>
         </div>
+
+        <div className="divide-y md:hidden">
+          {paginatedMembers.map(member => {
+            const name = member.nomeCompleto || member.nome || 'Nome não informado';
+
+            return (
+              <article key={member.id} className="flex items-center gap-2 border-b py-3 last:border-b-0">
+                <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => handleViewDetails(member)} aria-label={`Ver detalhes de ${name}`}>
+                  {member.avatar_url ? (
+                    <img src={member.avatar_url} alt="" className="h-12 w-12 shrink-0 rounded-full border object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
+                      {member.nome?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="max-w-[20ch] break-words font-semibold leading-snug">{name}</h3>
+                    <div className="mt-1 flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
+                      <span className="min-w-0 truncate"><MemberTypeBadge type={getMemberType(member)} /></span>
+                      <Badge className="shrink-0" variant={member.status === 'ativo' ? 'default' : 'secondary'}>
+                        {member.status === 'ativo' ? 'Ativo' : 'Desligado'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              </article>
+            );
+          })}
+        </div>
         
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 py-4 border-t">
+          <div className="flex flex-col gap-3 border-t px-2 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
               Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, membersFiltradosPorLetra.length)} de {membersFiltradosPorLetra.length} registros
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-1 sm:justify-start sm:gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
+                className="hidden sm:inline-flex"
               >
                 <ChevronsLeft className="h-4 w-4" />
               </Button>
@@ -329,7 +398,7 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <div className="flex items-center gap-1">
+              <div className="hidden items-center gap-1 sm:flex">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -356,6 +425,8 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
                 })}
               </div>
 
+              <span className="min-w-12 text-center text-sm tabular-nums sm:hidden">{currentPage} / {totalPages}</span>
+
               <Button
                 variant="outline"
                 size="sm"
@@ -369,6 +440,7 @@ export const MemberList = ({ members, onMemberUpdate, onMemberDelete, onRefresh,
                 size="sm"
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
+                className="hidden sm:inline-flex"
               >
                 <ChevronsRight className="h-4 w-4" />
               </Button>

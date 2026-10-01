@@ -5,8 +5,7 @@ import { useState, useCallback, ReactNode, useEffect } from 'react';
 import { AppContext } from './AppContext';
 import { useToast } from "@/components/ui/use-toast";
 import { Member, MemberFilters } from '@/types/member';
-
-const API_BASE_URL = 'http://localhost:5001/api';
+import { API_BASE_URL, apiAssetUrl } from '@/lib/api';
 
 export interface AppContextType {
   members: Member[];
@@ -39,7 +38,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const membersWithStatus = data.map((member: any) => ({
           ...member,
           status: member.situacaoAtual === 'Ativo' ? 'ativo' : 'desligado',
-          avatar_url: member.avatarUrl ? `http://localhost:5001${member.avatarUrl}` : undefined
+          avatar_url: member.avatarUrl ? apiAssetUrl(member.avatarUrl) : undefined
         }));
         
         setMembers(membersWithStatus);

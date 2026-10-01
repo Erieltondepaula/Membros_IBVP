@@ -156,54 +156,127 @@ class MemberServicePostgreSQL {
     return null;
   }
 
+  getImportFieldValues(newData) {
+    return {
+      id_externo: newData.idExterno || newData.id_externo,
+      nome: newData.nome,
+      sobrenome: newData.sobrenome,
+      nome_completo: this.getNomeCompleto(newData),
+      data_nascimento: newData.dataNascimento || newData.data_nascimento,
+      idade: newData.idade,
+      telefone: newData.telefone,
+      sexo: newData.sexo,
+      observacoes: newData.observacoes,
+      status_civil: newData.statusCivil || newData.status_civil,
+      conjuge: newData.conjuge,
+      parentesco: newData.parentesco,
+      rua: newData.rua,
+      numero: newData.numero,
+      bairro: newData.bairro,
+      cidade: newData.cidade,
+      estado: newData.estado,
+      cep: newData.cep,
+      batizado: newData.batizado,
+      membro: newData.membro,
+      situacao_atual: newData.situacaoAtual || newData.situacao_atual,
+      lider: newData.lider,
+      e_professor_ebq: newData.eProfessorEbq || newData.e_professor_ebq,
+      faixa_etaria: newData.faixaEtaria || newData.faixa_etaria,
+      pequeno_grupo: newData.pequenoGrupo || newData.pequeno_grupo,
+      grupo: newData.grupo,
+      numerodomes: newData.numeroDomes || newData.numerodomes,
+      avatar_url: newData.avatarUrl || newData.avatar_url,
+      ministro: newData.ministro
+    };
+  }
+
+  getImportFieldChanges(existingMember, newData) {
+    const labels = {
+      id_externo: 'ID externo',
+      nome: 'Nome',
+      sobrenome: 'Sobrenome',
+      nome_completo: 'Nome completo',
+      data_nascimento: 'Data de nascimento',
+      idade: 'Idade',
+      telefone: 'Telefone',
+      sexo: 'Sexo',
+      observacoes: 'Observações',
+      status_civil: 'Estado civil',
+      conjuge: 'Cônjuge',
+      parentesco: 'Parentesco',
+      rua: 'Rua',
+      numero: 'Número',
+      bairro: 'Bairro',
+      cidade: 'Cidade',
+      estado: 'Estado',
+      cep: 'CEP',
+      batizado: 'Batizado',
+      membro: 'Membro',
+      situacao_atual: 'Situação atual',
+      lider: 'Líder',
+      e_professor_ebq: 'Professor EBQ',
+      faixa_etaria: 'Faixa etária',
+      pequeno_grupo: 'Pequeno grupo',
+      grupo: 'Grupo',
+      numerodomes: 'Número do mês',
+      avatar_url: 'Foto',
+      ministro: 'Ministro'
+    };
+
+    return Object.entries(this.getImportFieldValues(newData)).flatMap(([column, newValue]) => {
+      const currentValue = existingMember[column];
+      const normalizedNew = this.normalizeImportFieldValue(column, newValue);
+      const normalizedCurrent = this.normalizeImportFieldValue(column, currentValue);
+
+      if (normalizedNew === null || normalizedNew === normalizedCurrent) return [];
+
+      return [{
+        column,
+        label: labels[column] || column,
+        currentValue: currentValue ?? null,
+        newValue
+      }];
+    });
+  }
+
+  normalizeImportFieldValue(column, value) {
+    if (column === 'data_nascimento') {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().slice(0, 10);
+      }
+      const text = this.normalizeValue(value);
+      if (text === null) return null;
+      const isoMatch = String(text).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if (isoMatch) {
+        return `${isoMatch[1]}-${String(isoMatch[2]).padStart(2, '0')}-${String(isoMatch[3]).padStart(2, '0')}`;
+      }
+      const brazilianMatch = String(text).match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+      if (brazilianMatch) {
+        return `${brazilianMatch[3]}-${String(brazilianMatch[2]).padStart(2, '0')}-${String(brazilianMatch[1]).padStart(2, '0')}`;
+      }
+      return text;
+    }
+
+    if (column === 'idade' || column === 'numerodomes') {
+      const text = this.normalizeValue(value);
+      if (text === null) return null;
+      const number = Number(text);
+      return Number.isNaN(number) ? text : number;
+    }
+
+    return this.normalizeValue(value);
+  }
+
   async updateIfDifferent(existingMember, newData) {
     const updates = [];
     const updateValues = [];
     let paramIndex = 1;
-    
-    const fieldsToCheck = {
-      'id_externo': newData.idExterno || newData.id_externo,
-      'nome': newData.nome,
-      'sobrenome': newData.sobrenome,
-      'nome_completo': this.getNomeCompleto(newData),
-      'data_nascimento': newData.dataNascimento || newData.data_nascimento,
-      'idade': newData.idade,
-      'telefone': newData.telefone,
-      'sexo': newData.sexo,
-      'observacoes': newData.observacoes,
-      'status_civil': newData.statusCivil || newData.status_civil,
-      'conjuge': newData.conjuge,
-      'parentesco': newData.parentesco,
-      'rua': newData.rua,
-      'numero': newData.numero,
-      'bairro': newData.bairro,
-      'cidade': newData.cidade,
-      'estado': newData.estado,
-      'cep': newData.cep,
-      'batizado': newData.batizado,
-      'membro': newData.membro,
-      'situacao_atual': newData.situacaoAtual || newData.situacao_atual,
-      'lider': newData.lider,
-      'e_professor_ebq': newData.eProfessorEbq || newData.e_professor_ebq,
-      'faixa_etaria': newData.faixaEtaria || newData.faixa_etaria,
-      'pequeno_grupo': newData.pequenoGrupo || newData.pequeno_grupo,
-      'grupo': newData.grupo,
-      'numerodomes': newData.numeroDomes || newData.numerodomes,
-      'avatar_url': newData.avatarUrl || newData.avatar_url,
-      'ministro': newData.ministro
-    };
-    
-    for (const [fieldName, newValue] of Object.entries(fieldsToCheck)) {
-      const currentValue = existingMember[fieldName];
-      const normalizedNew = this.normalizeValue(newValue);
-      const normalizedCurrent = this.normalizeValue(currentValue);
-      
-      if (normalizedNew !== normalizedCurrent && normalizedNew !== null) {
-        updates.push(`${fieldName} = $${paramIndex}`);
-        updateValues.push(newValue);
-        paramIndex++;
-        console.log(`    Campo ${fieldName}: "${currentValue}" -> "${newValue}"`);
-      }
+
+    for (const change of this.getImportFieldChanges(existingMember, newData)) {
+      updates.push(`${change.column} = $${paramIndex}`);
+      updateValues.push(change.newValue);
+      paramIndex++;
+      console.log(`    Campo ${change.column}: "${change.currentValue}" -> "${change.newValue}"`);
     }
     
     if (updates.length === 0) {

@@ -46,17 +46,37 @@ const avatarCleanupService = require('./services/avatarCleanupService');
 
 const app = express();
 
-// Configuração do CORS atualizada para permitir a nova porta estável 8081
+const allowedOrigins = [
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'http://localhost:3000'
+];
+
+const isPrivateNetworkHost = (hostname) =>
+  /^(localhost|127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})$/.test(hostname);
+
 const corsOptions = {
-  origin: [
-    'http://localhost:8080', 
-    'http://127.0.0.1:8080',
-    'http://localhost:8081', 
-    'http://127.0.0.1:8081',
-    'http://localhost:5173', 
-    'http://localhost:5174', 
-    'http://localhost:3000'
-  ],
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+
+    try {
+      const parsedOrigin = new URL(origin);
+      const supportedPort = ['3000', '5173', '5174', '8080', '8081'].includes(parsedOrigin.port);
+      if (parsedOrigin.protocol === 'http:' && supportedPort && isPrivateNetworkHost(parsedOrigin.hostname)) {
+        return callback(null, true);
+      }
+    } catch (error) {
+      return callback(error);
+    }
+
+    return callback(new Error('Origem não permitida pelo CORS'));
+  },
   optionsSuccessStatus: 200,
   credentials: true
 };

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { importFromExcel } from '@/utils/excelUtils';
 import { Member } from '@/types/member';
+import { apiUrl } from '@/lib/api';
 
 interface DadosItem {
   linha: number;
@@ -110,7 +111,7 @@ const ImportacaoInterativa = () => {
       }
 
       // Envia para o backend substituir tudo
-      const response = await fetch('http://localhost:5001/api/members/batch', {
+      const response = await fetch(apiUrl('/api/members/batch'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +173,7 @@ const ImportacaoInterativa = () => {
       // 🔍 BUSCAR MEMBROS EXISTENTES PARA COMPARAÇÃO
       let membrosExistentes: Member[] = [];
       try {
-        const response = await fetch('http://localhost:5001/api/members');
+        const response = await fetch(apiUrl('/api/members'));
         if (response.ok) {
           membrosExistentes = await response.json();
         }
@@ -422,7 +423,7 @@ const ImportacaoInterativa = () => {
       const membrosNovos = novos.map(item => item.membroCompleto).filter(Boolean);
 
       // Envia para o backend
-      const response = await fetch('http://localhost:5001/api/members/batch', {
+      const response = await fetch(apiUrl('/api/members/batch'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -485,7 +486,7 @@ const ImportacaoInterativa = () => {
       }));
 
       // Envia para o backend
-      const response = await fetch('http://localhost:5001/api/members/batch', {
+      const response = await fetch(apiUrl('/api/members/batch'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

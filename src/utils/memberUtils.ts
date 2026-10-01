@@ -234,11 +234,29 @@ export const getAgeGroupChartData = (members: Member[]): AgeGroupData[] => {
   return Object.keys(ageGroups).map(key => ({ faixaEtaria: key, quantidade: ageGroups[key], fill: AGE_RANGE_COLORS[key] }));
 };
 
+export const normalizeNeighborhoodName = (name: string): string => name
+  .trim()
+  .replace(/\s+/g, ' ')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLocaleLowerCase('pt-BR');
+
 export const getNeighborhoodData = (members: Member[]): NeighborhoodData[] => {
-  const neighborhoodCount = members.reduce((acc, member) => {
-    const bairro = member.bairro || 'Não informado';
-    acc[bairro] = (acc[bairro] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  return Object.keys(neighborhoodCount).map(bairro => ({ bairro, quantidade: neighborhoodCount[bairro] })).sort((a, b) => b.quantidade - a.quantidade);
+  const neighborhoods = new Map<string, { quantidade: number; nomes: Map<string, number> }>();
+
+  members.forEach(member => {
+    const bairro = member.bairro?.trim().replace(/\s+/g, ' ') || 'Não informado';
+    const key = normalizeNeighborhoodName(bairro);
+    const group = neighborhoods.get(key) || { quantidade: 0, nomes: new Map<string, number>() };
+    group.quantidade += 1;
+    group.nomes.set(bairro, (group.nomes.get(bairro) || 0) + 1);
+    neighborhoods.set(key, group);
+  });
+
+  return Array.from(neighborhoods.values())
+    .map(group => ({
+      bairro: Array.from(group.nomes.entries()).sort((a, b) => b[1] - a[1])[0][0],
+      quantidade: group.quantidade
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade);
 };

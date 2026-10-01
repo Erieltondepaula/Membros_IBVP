@@ -233,7 +233,7 @@
                                     // Limpa servidores fantasmas antigos da porta 8081
                                     shell.Run("cmd.exe /c taskkill /F /FI \"WINDOWTITLE eq http-server*\" /IM cmd.exe", 0, true);
                                     // Sobe o servidor de arquivos perfeitamente na porta 8081 com fallback SPA
-                                    shell.Run("cmd.exe /c cd dist && http-server -p 8081 -a 127.0.0.1 -c-1 -P http://127.0.0.1:8081?", 0, false);
+                                    shell.Run("cmd.exe /c cd dist && http-server -p 8081 -a 0.0.0.0 -c-1 -P http://127.0.0.1:8081?", 0, false);
                                     
                                     setTimeout(function() {
                                         atualizarItem("frontend", "success", "Frontend Build Iniciado");
@@ -268,7 +268,7 @@
 
         function acaoSim() {
             // Abre o navegador apontando para a porta 8081 onde o painel visual funciona
-            shell.Run("cmd.exe /c start http://127.0.0.1:8081", 0, false);
+            shell.Run("cmd.exe /c start http://localhost:8081", 0, false);
             
             document.getElementById("pergunta").innerText = "O sistema está rodando em segundo plano.";
             document.getElementById("botoes").style.display = "none";
@@ -323,7 +323,7 @@
             <div class="service-item">
                 <span id="frontend-icon" class="status-icon"><span class='wait-icon'>○</span></span>
                 <span id="frontend-text">Frontend Build</span>
-                <span class="sub-info">http://127.0.0.1:8081</span>
+                <span class="sub-info">http://localhost:8081</span>
             </div>
             <div class="service-item">
                 <span id="pgadmin-icon" class="status-icon"><span class='wait-icon'>○</span></span>

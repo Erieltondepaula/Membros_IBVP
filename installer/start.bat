@@ -10,7 +10,7 @@ REM Aguarda o backend subir (ajuste o tempo se necessário)
 timeout /t 5 > nul
 
 REM Abre o frontend no navegador padrão
-start http://localhost:8080
+start http://localhost:8081
 
 REM Mensagem final
 @echo Sistema iniciado. Feche esta janela para encerrar.

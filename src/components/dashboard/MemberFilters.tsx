@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Member, MemberFilters as MemberFiltersType } from '@/types/member';
-import { Search, RotateCcw, CheckSquare, Gift, CalendarDays } from 'lucide-react';
+import { Search, RotateCcw, CheckSquare, Gift, CalendarDays, SlidersHorizontal } from 'lucide-react';
 
 interface MemberFiltersProps {
   members: Member[];
@@ -20,6 +20,7 @@ interface MemberFiltersProps {
 export const MemberFilters = ({ members, filters, onFiltersChange }: MemberFiltersProps) => {
   const [dataInicial, setDataInicial] = useState(filters.aniversariantesPeriodo?.dataInicial || '');
   const [dataFinal, setDataFinal] = useState(filters.aniversariantesPeriodo?.dataFinal || '');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const uniqueBairros = Array.from(new Set(members.map(m => m.bairro).filter(Boolean))).sort();
 
@@ -105,13 +106,18 @@ const handleBirthdayFilterChange = (
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <CardTitle className="flex items-center gap-2"><Search /> Filtros</CardTitle>
-        <Button variant="outline" onClick={clearAllFilters} size="sm">
-          <RotateCcw className="h-4 w-4 mr-2" /> Limpar Tudo
-        </Button>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Button variant="outline" onClick={() => setIsFiltersOpen(open => !open)} size="sm" className="flex-1 md:hidden">
+            <SlidersHorizontal className="mr-2 h-4 w-4" />{isFiltersOpen ? 'Ocultar filtros' : 'Mostrar filtros'}
+          </Button>
+          <Button variant="outline" onClick={clearAllFilters} size="sm" className={`${isFiltersOpen ? 'inline-flex' : 'hidden'} w-full sm:w-auto md:inline-flex`}>
+            <RotateCcw className="h-4 w-4 mr-2" /> Limpar Tudo
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className={`${isFiltersOpen ? 'block' : 'hidden'} space-y-6 p-4 pt-0 sm:p-6 sm:pt-0 md:block`}>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Input placeholder="Pesquisar por nome..." value={filters.search || ''} onChange={e => handleFilterChange('search', e.target.value || undefined)} className="md:col-span-2" />
           {/* ✅ Por padrão mostra apenas ATIVOS, usuário pode selecionar Desligados explicitamente */}
@@ -149,7 +155,7 @@ const handleBirthdayFilterChange = (
 
         <div className="border-t pt-4 space-y-3">
            <Label className="flex items-center gap-2 font-semibold"><Gift />Filtrar por Aniversariantes</Label>
-           <div className="flex flex-col md:flex-row md:items-end gap-4">
+           <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-end">
               <div className="flex items-center space-x-2 pt-5">
                 {/* ✅ COLE ESTA LINHA NO LUGAR DA ANTIGA */}
 <Checkbox id="aniversariantesDoMes" checked={!!filters.aniversariantesDoMes} onCheckedChange={checked => handleBirthdayFilterChange('aniversariantesDoMes', !!checked)} />
@@ -160,10 +166,10 @@ const handleBirthdayFilterChange = (
 <Checkbox id="aniversariantesDoDia" checked={!!filters.aniversariantesDoDia} onCheckedChange={checked => handleBirthdayFilterChange('aniversariantesDoDia', !!checked)} />
                 <Label htmlFor="aniversariantesDoDia">De Hoje</Label>
               </div>
-              <div className="flex items-end gap-2 flex-grow">
-                <div className="w-full"><Label htmlFor="dataInicial">Data Inicial</Label><Input type="date" id="dataInicial" value={dataInicial} onChange={e => setDataInicial(e.target.value)} /></div>
-                <div className="w-full"><Label htmlFor="dataFinal">Data Final</Label><Input type="date" id="dataFinal" value={dataFinal} onChange={e => setDataFinal(e.target.value)} /></div>
-                <Button onClick={handleSearchByPeriod}><CalendarDays className="h-4 w-4 md:mr-2"/> <span className="hidden md:inline">Pesquisar Período</span></Button>
+              <div className="grid min-w-0 flex-grow grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <div className="min-w-0"><Label htmlFor="dataInicial">Data Inicial</Label><Input className="w-full min-w-0" type="date" id="dataInicial" value={dataInicial} onChange={e => setDataInicial(e.target.value)} /></div>
+                <div className="min-w-0"><Label htmlFor="dataFinal">Data Final</Label><Input className="w-full min-w-0" type="date" id="dataFinal" value={dataFinal} onChange={e => setDataFinal(e.target.value)} /></div>
+                <Button onClick={handleSearchByPeriod} className="w-full md:w-auto"><CalendarDays className="h-4 w-4 md:mr-2"/> <span className="md:inline">Pesquisar Período</span></Button>
               </div>
            </div>
         </div>

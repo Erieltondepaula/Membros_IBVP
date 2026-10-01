@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, PDFImage } from 'pdf-lib';
+import { apiAssetUrl } from '@/lib/api';
 
 export interface CardData {
   nome: string;
@@ -113,7 +114,7 @@ export async function generateMemberCard(member: CardData): Promise<Uint8Array> 
 
   if (member.avatar_url) {
     try {
-      const url = member.avatar_url.startsWith('http') ? member.avatar_url : `http://localhost:5001${member.avatar_url}`;
+      const url = apiAssetUrl(member.avatar_url);
       const response = await fetch(url);
       if (response.ok) {
         const buffer = await response.arrayBuffer();

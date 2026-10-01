@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Member } from '@/types/member';
-import { getNeighborhoodData } from '@/utils/memberUtils';
+import { getNeighborhoodData, normalizeNeighborhoodName } from '@/utils/memberUtils';
 import { MapPin, Users, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
 import { useState } from 'react';
 import { getHeatColor } from '@/constants/chartColors';
@@ -30,7 +30,10 @@ export const NeighborhoodMap = ({ members, onNeighborhoodClick }: NeighborhoodMa
 
   // Calcular estatísticas detalhadas por bairro
   const getNeighborhoodStats = (bairro: string): NeighborhoodStats => {
-    const membrosBairro = members.filter(m => m.bairro === bairro && m.status === 'ativo');
+    const bairroKey = normalizeNeighborhoodName(bairro);
+    const membrosBairro = members.filter(m =>
+      normalizeNeighborhoodName(m.bairro || 'Não informado') === bairroKey && m.status === 'ativo'
+    );
     
     const faixasEtarias: Record<string, number> = {
       '0-12': membrosBairro.filter(m => (m.idade || 0) <= 12).length,
@@ -96,17 +99,17 @@ export const NeighborhoodMap = ({ members, onNeighborhoodClick }: NeighborhoodMa
               >
                 {/* Cabeçalho do bairro */}
                 <div
-                  className="p-4 cursor-pointer hover:bg-muted/30 transition-colors flex items-center justify-between"
+                  className="flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
                   onClick={() => toggleExpand(neighborhood.bairro)}
                 >
-                  <div className="flex items-center gap-4 flex-1">
+                  <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center sm:gap-4">
                     <div 
                       className="w-3 h-3 rounded-full" 
                       style={{ backgroundColor: heatColor }}
                     />
                     <div className="flex-1">
                       <h3 className="font-semibold text-base">{neighborhood.bairro}</h3>
-                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
                           {neighborhood.quantidade} membros
@@ -119,7 +122,7 @@ export const NeighborhoodMap = ({ members, onNeighborhoodClick }: NeighborhoodMa
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-3 sm:justify-end">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

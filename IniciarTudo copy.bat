@@ -11,7 +11,7 @@ echo Este script vai iniciar:
 echo   1. PostgreSQL (se nao estiver rodando)
 echo   2. Backup Automatico do Banco
 echo   3. Backend API (Porta 5001)
-echo   4. Frontend Build (Porta 8080) - SOMENTE SE EXISTIR
+echo   4. Frontend Build (Porta 8081) - SOMENTE SE EXISTIR
 echo   5. pgAdmin 4 (Porta 5050)
 echo.
 echo ==========================================
@@ -112,7 +112,7 @@ if %ERRORLEVEL% NEQ 0 (
     call npm install -g http-server
 )
 
-start "FRONTEND-BUILD" cmd /k "cd /d %~dp0dist && title FRONTEND-BUILD-8080 && color 03 && echo ================================= && echo FRONTEND BUILD - PORTA 8080 && echo ================================= && http-server -p 8080 -a localhost -P http://localhost:8080?"
+start "FRONTEND-BUILD" cmd /k "cd /d %~dp0dist && title FRONTEND-BUILD-8081 && color 03 && echo ================================= && echo FRONTEND BUILD - PORTA 8081 && echo ================================= && http-server -p 8081 -a 0.0.0.0 -P http://127.0.0.1:8081?"
 
 echo Aguardando frontend inicializar...
 timeout /t 5 /nobreak >nul
@@ -154,11 +154,11 @@ echo.
 echo STATUS DOS SERVICOS:
 echo   [OK] PostgreSQL       localhost:5432
 echo   [OK] Backend API      http://localhost:5001
-echo   [OK] Frontend Build   http://localhost:8080
+echo   [OK] Frontend Build   http://localhost:8081
 echo   [??] pgAdmin 4        http://localhost:5050
 echo.
 echo ACESSOS PRINCIPAIS:
-echo   Aplicacao:            http://localhost:8080
+echo   Aplicacao:            http://localhost:8081
 echo   API Membros:          http://localhost:5001/api/members
 echo   Banco de Dados:       pgAdmin em http://localhost:5050
 echo.
@@ -176,7 +176,7 @@ if /i not "%OPEN_ALL%"=="n" (
     echo.
     echo Abrindo navegador da aplicacao...
     timeout /t 2 /nobreak >nul
-    start http://localhost:8080
+    start http://localhost:8081
     echo OK: Navegador da aplicacao aberto!
 )
 
